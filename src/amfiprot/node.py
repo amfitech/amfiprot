@@ -12,28 +12,30 @@ if typing.TYPE_CHECKING:
 class Node:
     """ A `Node` represents a single endpoint on a `Connection`. One `Connection` can
     have multiple nodes, e.g. if the PC connects via USB to a device which in turn is connected
-    to additional devices via RF. """
+    to additional devices via RF """
     def __init__(self, tx_id, uuid, connection: Connection):
         self.connection = connection
         self.tx_id = tx_id
         self.uuid = uuid
-        self.receive_queue: mp.Queue = mp.Queue()
-        self.packet_number = 0
-        self.name = None
+        self.receive_queue: mp.Queue = mp.Queue(maxsize=128)
 
-    def packet_available(self) -> bool:
-        return not self.receive_queue.empty()  # Do not use qsize() as it is unreliable, and not supported on Mac
+    def available_packets(self) -> int:
+        return self.receive_queue.qsize()
 
-    def get_packet(self, blocking=False, timeout_ms=1000) -> typing.Optional[Packet]:
+    def get_packet(self, blocking=False, timeout_ms=1000) -> Packet:
         if self.receive_queue.empty() and not blocking:
             return None
 
-        # TODO: Implement timeout
+        # start_time = time.time_ns() / 1000
+        # while self.receive_queue.empty() and (time.time_ns()/1000) - start_time < timeout_ms:
+        #     self.connection.process()
+        #
+        # if self.receive_queue.empty():
+        #     return None
 
         return self.receive_queue.get()
 
     def send_packet(self, packet: Packet):
-        """ Send a pre-assembled packet. Note that this does not increment the packet number! """
         self.connection.enqueue_packet(packet)
 
     def send_payload(self,
@@ -43,18 +45,12 @@ class Node:
         packet = Packet.from_payload(payload,
                                      destination_id=self.tx_id,
                                      source_id=source_id,
-                                     packet_type=packet_type,
-                                     packet_number=self.packet_number)
+                                     packet_type=packet_type)
         self.send_packet(packet)
-
-        self.packet_number = (self.packet_number + 1) % 255
 
     def flush_receive_queue(self):
         while not self.receive_queue.empty():
             self.receive_queue.get_nowait()
 
-    def max_payload_size(self):
-        return self.connection.max_payload_size()
-
     def __str__(self):
-        return f"<Node> name: {self.name}, tx_id: {self.tx_id}, uuid: 0x{self.uuid:024X}"
+        return f"<Node> tx_id: {self.tx_id}, uuid: {self.uuid:024x}"

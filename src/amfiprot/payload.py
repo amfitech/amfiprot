@@ -13,28 +13,24 @@ class PayloadType(IntEnum):
 
 class Payload(metaclass=ABCMeta):
     @abstractmethod
-    def __len__(self) -> int:
-        """ Length of the payload in bytes (without the CRC byte) """
+    def __len__(self):
         pass
 
     @abstractmethod
-    def __str__(self) -> str:
+    def __str__(self):
         pass
 
     @property
     @abstractmethod
-    def type(self) -> PayloadType:
-        """ Returns the payload type """
+    def type(self):
         pass
 
     @abstractmethod
-    def to_bytes(self) -> array.array:
-        """ Returns the payload as an array of raw bytes (without CRC) """
+    def to_bytes(self):
         pass
     
     @abstractmethod
-    def to_dict(self) -> dict:
-        """ Returns the payload as a dict """
+    def to_dict(self):
         pass
 
 

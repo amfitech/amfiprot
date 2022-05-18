@@ -6,7 +6,6 @@ import enum
 import crcmod
 from .payload import Payload, PayloadType, UndefinedPayload
 from .common_payload import create_common_payload
-from .response_payload import *
 
 
 class PacketType(enum.IntEnum):
@@ -16,11 +15,16 @@ class PacketType(enum.IntEnum):
     REPLY = 3
 
 
-class PacketDestination(enum.IntEnum):
-    PC = 0
-    BROADCAST = 255
+class Packet:
+    """ This class can be instantiated from:
+        - raw byte data (received from USB, for example) and an optional PayloadFactory. If no factory is given, only
+            built-in amfiprot types are used. If the payload_type is not a built-in type, the Packet will contain an
+            UndefinedPayload.
+        - a payload and additional header data
+    """
 
-class Header:
+    MAX_PACKET_LENGTH = 64  # TODO: Not really a limit to a generic packet, is there?
+
     class HeaderIndex(enum.IntEnum):
         PAYLOAD_LENGTH = 0
         """
@@ -37,153 +41,111 @@ class Header:
         """
         PAYLOAD_TYPE = 3
         """
-        See :class:`amfiprot.payload.PayloadType`
+        See :class:`amfitrack.amfiprot.payload.PayloadType`
         """
         SOURCE_TX_ID = 4
         DESTINATION_TX_ID = 5
+        HEADER_CRC = 6
+        """
+        CRC of the data header (not including the two byte USB header)
+        """
 
-    @classmethod
-    def length(cls):
-        return len(cls.HeaderIndex)
-
-    def __init__(self, data):
-        self.data = data
-        self.payload_length = data[self.HeaderIndex.PAYLOAD_LENGTH]
-        self.packet_type = data[self.HeaderIndex.PACKET_TYPE]
-        self.packet_number = data[self.HeaderIndex.PACKET_NUMBER]
-        self.payload_type = data[self.HeaderIndex.PAYLOAD_TYPE]
-        self.source_tx_id = data[self.HeaderIndex.SOURCE_TX_ID]
-        self.destination_tx_id = data[self.HeaderIndex.DESTINATION_TX_ID]
-
-    def __len__(self):
-        return self.length()
-
-    def __str__(self):
-        return f"<Header> src: {self.source_tx_id}, dest: {self.destination_tx_id}, payload_type: {self.payload_type}, packet_number: {self.packet_number}"
-
-    def to_bytes(self):
-        return array.array('B', self.data)
-
-
-class Packet:
     def __init__(self, byte_data: array.array):  # Using array.array('B') since it's faster than bytearray()
+        """ Init docstring """
+        # if byte_data is not None and len(byte_data) < len(self.HeaderIndex) + 2:
+        #     raise ValueError("Data does not contain full header")
+        #
+        # if len(byte_data) > self.MAX_PACKET_LENGTH:
+        #     raise ValueError("Data exceeds max packet length of 64 bytes")
+        #
+        # if len(byte_data) - self.HEADER_LENGTH < byte_data[self.HeaderIndex.PAYLOAD_LENGTH]:
+        #     raise ValueError("Data exceeds max packet length of 64 bytes")
+        #
         self.data: array.array = byte_data
-        self.header = Header(self.data[:Header.length()])
+        #
+        # if len(self.data) <= self.HEADER_LENGTH:
+        #     return
+        self.header = self.data[:len(self.HeaderIndex)]
 
-        if self.header.payload_length == 0:
-            self.payload = None
-        else:
-            payload_start_index = Header.length() + 1  # CRC
-            payload_end_index = payload_start_index + self.header.payload_length
-            payload_data = self.data[payload_start_index:payload_end_index]
+        self.payload_data = self.data[len(self.HeaderIndex):len(self.HeaderIndex)+self.payload_length]
 
-            # Create payload object that corresponds to payload_type
-            self.payload = create_payload_from_type(payload_data, self.header.payload_type)
+        # Create payload object that corresponds to payload_type
+        self.payload = create_payload_from_type(self.payload_data, self.payload_type)
 
     @classmethod
-    def from_payload(cls, payload, destination_id, source_id=0, packet_type=PacketType.NO_ACK, packet_number: int = 0):
+    def from_payload(cls, payload, destination_id, source_id=0, packet_type=PacketType.NO_ACK):
         data = array.array('B', [len(payload),
                                  packet_type,
-                                 packet_number,
+                                 0,
                                  payload.type,
                                  source_id,
                                  destination_id])
 
+        # cls.packet_number = (cls.packet_number + 1) % 255
+
         # Append header CRC (not including report_id and packet_length)
-        header_crc = calculate_crc(data[:])
-        data.append(header_crc)
+        crc8 = crcmod.Crc(0x12F, initCrc=0, rev=False)
+        crc8.update(data[:])
+        data.append(crc8.crcValue)
 
         # Append payload and CRC
-        payload_data = payload.to_bytes()
-        payload_crc = calculate_crc(payload_data)
-        data.extend(payload_data)
-        data.append(payload_crc)
+        crc8.crcValue = 0  # Remember to reset crcValue
+        data.extend(payload.to_bytes())
+        crc8.update(payload.to_bytes())
+        data.append(crc8.crcValue)
+        # print(f"crc: 0x{crc8.crcValue:02x}")
 
-        return Packet(data)
+        packet = Packet(data)
+        return packet
 
     def __len__(self):
         return len(self.data)
 
     @property
     def packet_type(self):
-        return self.header.packet_type
-
-    @packet_type.setter
-    def packet_type(self, message_type):
-        self.header.packet_type = message_type
+        return self.data[self.HeaderIndex.PACKET_TYPE]
 
     @property
     def payload_length(self):
-        return self.header.payload_length
+        return self.data[self.HeaderIndex.PAYLOAD_LENGTH]
 
     @property
-    def payload_type(self) -> PayloadType:
-        return self.header.payload_type
+    def payload_type(self) -> int:
+        return self.data[self.HeaderIndex.PAYLOAD_TYPE]
 
     @property
     def source_id(self):
-        return self.header.source_tx_id
+        return self.data[self.HeaderIndex.SOURCE_TX_ID]
 
     @property
     def destination_id(self):
-        return self.header.destination_tx_id
-
-    @property
-    def header_crc(self):
-        return self.data[Header.length()]
-
-    @property
-    def payload_crc(self):
-        if self.header.payload_length == 0:
-            return 0
-
-        return self.data[len(self.header) + 1 + self.header.payload_length]
+        return self.data[self.HeaderIndex.DESTINATION_TX_ID]
 
     @destination_id.setter
     def destination_id(self, identifier):
-        self.header.destination_tx_id = identifier
+        self.data[self.HeaderIndex.DESTINATION_TX_ID] = identifier
+
+    @packet_type.setter
+    def packet_type(self, message_type):
+        self.data[self.HeaderIndex.PACKET_TYPE] = message_type
 
     def __str__(self):
-        return f"{self.header} {self.payload}"
+        return f"Dest: {self.destination_id}, Src: {self.source_id}, Payload_type: {self.payload_type}: {self.payload}"
 
     def to_bytes(self):
         """
-        Convert packet to an array of bytes (array.array('B')) for transmission
+        Convert packet to array.array('B') for transmission
         """
         return self.data
 
-    def crc_is_good(self) -> bool:
-        new_header_crc = calculate_crc(self.header.to_bytes())
-        header_crc_is_good = (self.header_crc == new_header_crc)
-
-        if not header_crc_is_good:
-            return False
-
-        if self.header.payload_length == 0:
-            return True
-        else:
-            # print(f"Checking crc for {self.payload}")
-            new_payload_crc = calculate_crc(self.payload.to_bytes())
-            return self.payload_crc == new_payload_crc
-
 
 amfiprot_payload_mappings = {
-        PayloadType.COMMON: create_common_payload,  # type: ignore
-        PayloadType.SUCCESS: SuccessPayload,
-        PayloadType.NOT_IMPLEMENTED: NotImplementedPayload,
-        PayloadType.FAILURE: FailurePayload,
-        PayloadType.INVALID_REQUEST: InvalidRequestPayload
+        PayloadType.COMMON: create_common_payload
     }
 
 
 def create_payload_from_type(payload_data: array.array, payload_type: PayloadType):
     if payload_type in amfiprot_payload_mappings:
-        return amfiprot_payload_mappings[payload_type](payload_data)  # type: ignore
+        return amfiprot_payload_mappings[payload_type](payload_data)
     else:
         return UndefinedPayload(payload_data, payload_type)
-
-
-def calculate_crc(data):
-    crc8 = crcmod.Crc(0x12F, initCrc=0, rev=False)
-    crc8.update(data[:])
-    return crc8.crcValue
