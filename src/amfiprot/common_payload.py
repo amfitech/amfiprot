@@ -40,8 +40,23 @@ class CommonPayloadId(enum.IntEnum):  # When PayloadType is Common, these Payloa
     REBOOT = 0x21
 
 
+class ConfigValueType(enum.IntEnum):
+    BOOL = 0
+    CHAR = 1
+    INT8 = 2
+    UINT8 = 3
+    INT16 = 4
+    UINT16 = 6
+    INT32 = 8
+    UINT32 = 10
+    INT64 = 12
+    UINT64 = 14
+    FLOAT = 16
+    DOUBLE = 18
+    PROCEDURE_CALL = 100
+
+
 class CommonPayload(Payload):
-    # TODO: Remove this interface and just let subclasses inherit from Payload directly? No, because type() is defined here.
     @classmethod
     @abstractmethod
     def from_bytes(cls, data):
@@ -96,6 +111,8 @@ class ReplyDeviceIdPayload(CommonPayload):
     def __init__(self, tx_id: int, uuid: int):
         self.tx_id = tx_id
         self.uuid = uuid
+        self.data = array.array('B', [CommonPayloadId.REPLY_DEVICE_ID, self.tx_id])
+        self.data.extend(self.uuid.to_bytes(12, byteorder='little'))
 
     @classmethod
     def from_bytes(cls, data):
@@ -122,6 +139,7 @@ class ReplyDeviceIdPayload(CommonPayload):
 class SetTxIdPayload(CommonPayload):
     def __init__(self, tx_id):
         self.tx_id = tx_id
+        self.data = array.array('B', [CommonPayloadId.SET_TX_ID, self.tx_id])
 
     @classmethod
     def from_bytes(cls, data):
@@ -139,6 +157,53 @@ class SetTxIdPayload(CommonPayload):
 
     def to_dict(self):
         pass
+
+
+class RequestFirmwareVersionPayload(CommonPayload):
+    def __init__(self):
+        self.data = array.array('B', [CommonPayloadId.REQUEST_FIRMWARE_VERSION])
+
+    @classmethod
+    def from_bytes(cls, data):
+        pass
+
+    def __str__(self):
+        pass
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        pass
+
+
+class ReplyFirmwareVersionPayload(CommonPayload):
+    def __init__(self, major: int, minor: int, patch: int, build: int):
+        self.fw_version = {'major': major, 'minor': minor, 'patch': patch, 'build': build}
+
+    @classmethod
+    def from_bytes(cls, data):
+        major = int.from_bytes(data[1:5], byteorder='little')
+        minor = int.from_bytes(data[5:9], byteorder='little')
+        patch = int.from_bytes(data[9:13], byteorder='little')
+        build = int.from_bytes(data[13:17], byteorder='little')
+        return ReplyFirmwareVersionPayload(major, minor, patch, build)
+
+    def __str__(self):
+        return f"Firmware version: {self.fw_version['major']}.{self.fw_version['minor']}.{self.fw_version['patch']}.{self.fw_version['build']}"
+
+    def __len__(self):
+        pass
+
+    def to_bytes(self):
+        pass
+
+    def to_dict(self):
+        pass
+
 
 
 class RequestDeviceNamePayload(CommonPayload):
@@ -182,7 +247,7 @@ class ReplyDeviceNamePayload(CommonPayload):
     def to_bytes(self):
         arr = array.array('B', [CommonPayloadId.REPLY_DEVICE_NAME])
         arr.extend(self.name.encode('ascii'))
-        arr.extend(0)
+        arr.append(0)
         return arr
 
     def to_dict(self):
@@ -241,6 +306,8 @@ class RequestCategoryCountPayload(CommonPayload):
 class ReplyCategoryCountPayload(CommonPayload):
     def __init__(self, category_count):
         self.category_count = category_count
+        self.data = array.array('B', [CommonPayloadId.REPLY_CATEGORY_COUNT])
+        self.data.extend(self.category_count.to_bytes(2, byteorder='little'))
 
     @classmethod
     def from_bytes(cls, data):
@@ -255,7 +322,7 @@ class ReplyCategoryCountPayload(CommonPayload):
 
     def to_bytes(self):
         arr = array.array('B', [CommonPayloadId.REPLY_CATEGORY_COUNT])
-        arr.extend = int.to_bytes(self.category_count, length=1, byteorder='little') # TODO: Just use directly?
+        arr.extend(int.to_bytes(self.category_count, length=1, byteorder='little')) # TODO: Just use directly?
         return arr
 
     def to_dict(self):
@@ -436,15 +503,17 @@ class RequestConfigurationValueUidPayload(CommonPayload):
 
 
 class ReplyConfigurationValueUidPayload(CommonPayload):
-    def __init__(self, config_value: int):
+    def __init__(self, uid, config_value: int, data_type: ConfigValueType):
         self.config_value = config_value
+        self.data_type = data_type
+        self.uid = uid
 
     @classmethod
     def from_bytes(cls, data):
         uid = int.from_bytes(data[1:5], byteorder='little')
         value_type = int.from_bytes(data[5:6], byteorder='little')
-        value = interpret_config_value(value_type, data[6:])
-        return ReplyConfigurationValueUidPayload(value)
+        value = decode_config_value(value_type, data[6:])
+        return ReplyConfigurationValueUidPayload(uid, value, value_type)
 
     def __str__(self):
         return f"<Config value> {self.config_value}"
@@ -459,25 +528,188 @@ class ReplyConfigurationValueUidPayload(CommonPayload):
         pass
 
 
+class LoadDefaultConfigurationPayload(CommonPayload):
+    def __init__(self):
+        self.data = array.array('B', [CommonPayloadId.LOAD_DEFAULT])
+
+    @classmethod
+    def from_bytes(cls, data):
+        pass
+
+    def __str__(self):
+        pass
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        pass
+
+class SaveAsDefaultConfigurationPayload(CommonPayload):
+    def __init__(self):
+        self.data = array.array('B', CommonPayloadId.SAVE_AS_DEFAULT)
+
+    @classmethod
+    def from_bytes(cls, data):
+        pass
+
+    def __str__(self):
+        pass
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        pass
+
+
+class FirmwareStartPayload(CommonPayload):
+    def  __init__(self, processor_id: int = 0):
+        self.data = array.array('B', [CommonPayloadId.FIRMWARE_START, processor_id])
+
+    @classmethod
+    def from_bytes(cls, data):
+        pass
+
+    def __str__(self):
+        pass
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        pass
+
+
+class FirmwareDataPayload(CommonPayload):
+    def __init__(self, firmware_data: tuple, processor_id: int = 0):
+        self.data = array.array('B', [CommonPayloadId.FIRMWARE_DATA, processor_id])
+        firmware_bytes = array.array('B', firmware_data)
+        self.data.extend(firmware_bytes)
+
+    @classmethod
+    def from_bytes(cls, data):
+        pass
+
+    def __str__(self):
+        pass
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        pass
+
+
+class FirmwareEndPayload(CommonPayload):
+    def __init__(self, processor_id: int = 0):
+        self.data = array.array('B', [CommonPayloadId.FIRMWARE_END, processor_id])
+
+    @classmethod
+    def from_bytes(cls, data):
+        pass
+
+    def __str__(self):
+        pass
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        pass
+
+
+class SetConfigurationValueUidPayload(CommonPayload):
+    def __init__(self, uid, value, data_type):
+        self.data = array.array('B', [CommonPayloadId.SET_CONFIGURATION_VALUE_UID])
+        self.data.extend(int.to_bytes(uid, length=4, byteorder='little'))
+        self.data.extend(int.to_bytes(data_type, length=1, byteorder='little'))
+        self.data.extend(encode_config_value(value, data_type))
+
+    @classmethod
+    def from_bytes(cls, data):
+        pass
+
+    def __str__(self):
+        pass
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        pass
+
+
 def byte_array_to_string(byte_array: array.array):
     return bytes(byte_array).decode('ascii').rstrip('\x00')
 
 
-def interpret_config_value(value_type: int, byte_data: array.array):
-    if value_type == 0:  # bool
+def decode_config_value(data_type: ConfigValueType, byte_data: array.array):
+    if data_type == ConfigValueType.BOOL:
         return bool(int.from_bytes(byte_data, byteorder='little'))
-    elif value_type == 1:  # char
+    elif data_type == ConfigValueType.CHAR:
         return byte_data.decode('ascii')
-    elif value_type == 2:  # int8
+    elif data_type in [ConfigValueType.INT8, ConfigValueType.INT16, ConfigValueType.INT32, ConfigValueType.INT64]:
         return int.from_bytes(byte_data, byteorder='little', signed=True)
-    elif value_type == 3:  # uint8
+    elif data_type in [ConfigValueType.UINT8, ConfigValueType.UINT16, ConfigValueType.UINT32, ConfigValueType.UINT64]:
         return int.from_bytes(byte_data, byteorder='little', signed=False)
-    elif value_type == 10:  # uint32
-        return int.from_bytes(byte_data, byteorder='little', signed=False)
-    elif value_type == 16:  # float
+    elif data_type == ConfigValueType.FLOAT:
         return struct.unpack('f', byte_data)[0]
-    elif value_type == 100:  # procedure call
+    elif data_type == ConfigValueType.DOUBLE:
+        return struct.unpack('d', byte_data)[0]
+    elif data_type == ConfigValueType.PROCEDURE_CALL:
         return bool(int.from_bytes(byte_data, byteorder='little'))
+    else:
+        return None
+
+def encode_config_value(value, data_type: ConfigValueType):
+    if data_type == ConfigValueType.BOOL:
+        return struct.pack("?", value)
+    elif data_type == ConfigValueType.CHAR:
+        return struct.pack("c", value)
+    elif data_type == ConfigValueType.INT8:
+        return struct.pack("b", value)
+    elif data_type == ConfigValueType.UINT8:
+        return struct.pack("B", value)
+    elif data_type == ConfigValueType.INT16:
+        return struct.pack("<h", value)
+    elif data_type == ConfigValueType.UINT16:
+        return struct.pack("<H", value)
+    elif data_type == ConfigValueType.INT32:
+        return struct.pack("<i", value)
+    elif data_type == ConfigValueType.UINT32:
+        return struct.pack("<I", value)
+    elif data_type == ConfigValueType.INT64:
+        return struct.pack("<q", value)
+    elif data_type == ConfigValueType.UINT64:
+        return struct.pack("<Q", value)
+    elif data_type == ConfigValueType.FLOAT:
+        return struct.pack("f", value)
+    elif data_type == ConfigValueType.DOUBLE:
+        return struct.pack("d", value)
+    elif data_type == ConfigValueType.PROCEDURE_CALL:
+        return struct.pack("?", value)
+    else:
+        return None
+
 
 payload_ids = {
             CommonPayloadId.REQUEST_DEVICE_ID: RequestDeviceIdPayload,
@@ -493,7 +725,16 @@ payload_ids = {
             CommonPayloadId.REQUEST_CONFIGURATION_VALUE_COUNT: RequestConfigurationValueCountPayload,
             CommonPayloadId.REPLY_CONFIGURATION_VALUE_COUNT: ReplyConfigurationValueCountPayload,
             CommonPayloadId.REQUEST_CONFIGURATION_VALUE_UID: RequestConfigurationValueUidPayload,
-            CommonPayloadId.REPLY_CONFIGURATION_VALUE_UID: ReplyConfigurationValueUidPayload
+            CommonPayloadId.REPLY_CONFIGURATION_VALUE_UID: ReplyConfigurationValueUidPayload,
+            CommonPayloadId.REQUEST_FIRMWARE_VERSION: RequestFirmwareVersionPayload,
+            CommonPayloadId.REPLY_FIRMWARE_VERSION: ReplyFirmwareVersionPayload,
+            CommonPayloadId.REBOOT: RebootPayload,
+            CommonPayloadId.LOAD_DEFAULT: LoadDefaultConfigurationPayload,
+            CommonPayloadId.SET_CONFIGURATION_VALUE_UID: SetConfigurationValueUidPayload,
+            CommonPayloadId.SAVE_AS_DEFAULT: SaveAsDefaultConfigurationPayload,
+            CommonPayloadId.FIRMWARE_START: FirmwareStartPayload,
+            CommonPayloadId.FIRMWARE_DATA:FirmwareDataPayload,
+            CommonPayloadId.FIRMWARE_END: FirmwareEndPayload
         }
 
 

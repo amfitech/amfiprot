@@ -3,9 +3,10 @@ import usb.core
 import usb.util
 import multiprocessing as mp
 import time
+import crcmod
 from abc import ABC, abstractmethod
 from typing import List
-from .packet import Packet
+from .packet import Packet, PacketDestination
 from .common_payload import RequestDeviceIdPayload, ReplyDeviceIdPayload
 from .node import Node
 
@@ -29,10 +30,19 @@ class Connection(ABC):
     def enqueue_packet(self, packet: Packet):
         pass
 
+    @abstractmethod
+    def max_payload_size(self) -> int:
+        pass
+
 
 class UsbConnection(Connection):
-    def __init__(self, app_specific_payload_types: dict = None):
-        usb_devices = get_amfitrack_devices()
+    MAX_PAYLOAD_SIZE = 55
+
+    def __init__(self, vendor_id: int = 0x0C17, product_id: int = 0x0D12):
+        self.vendor_id = vendor_id
+        self.product_id = product_id
+
+        usb_devices = get_usb_devices(vendor_id, product_id)
         if len(usb_devices) > 0:
             self.usb_device = usb_devices[0]
             self.usb_device.set_configuration()
@@ -47,7 +57,7 @@ class UsbConnection(Connection):
     def find_nodes(self) -> List[Node]:
         # Create 'request device id' packet
         payload = RequestDeviceIdPayload()
-        packet = Packet.from_payload(payload, destination_id=255)  # TODO: Make enum for destination BROADCAST and PC
+        packet = Packet.from_payload(payload, destination_id=PacketDestination.BROADCAST)
 
         # Send packet via USB
         bytes_to_transmit: array.array = array.array('B', [1])  # USB header Report ID, packet length only required on IN packets (???)
@@ -55,7 +65,6 @@ class UsbConnection(Connection):
 
         while len(bytes_to_transmit) < 64:
             bytes_to_transmit.append(0)
-
 
         self.usb_device.write(0x1, bytes_to_transmit, 1000)
 
@@ -84,16 +93,19 @@ class UsbConnection(Connection):
     def enqueue_packet(self, packet: Packet):
         self.transmit_queue.put(packet)
 
+    def max_payload_size(self) -> int:
+        return self.MAX_PAYLOAD_SIZE
+
     def start(self):
         # Create tx process
-        self.transmit_process = mp.Process(target=transmit_usb_packets, args=(self.transmit_queue,))
+        self.transmit_process = mp.Process(target=transmit_usb_packets, args=(self.vendor_id, self.product_id, self.transmit_queue))
         self.transmit_process.start()
 
         # Create rx process
         tx_ids = [node.tx_id for node in self.nodes]
         rx_queues = [node.receive_queue for node in self.nodes]
 
-        self.receive_process = mp.Process(target=receive_usb_packets, args=(tx_ids, rx_queues))
+        self.receive_process = mp.Process(target=receive_usb_packets, args=(self.vendor_id, self.product_id, tx_ids, rx_queues))
         self.receive_process.start()
 
     def stop(self):
@@ -125,10 +137,10 @@ class UsbConnection(Connection):
                f" PID={product_id}, SN={serial_number}"
 
 
-def receive_usb_packets(tx_ids, rx_queues: List[mp.Queue]):
+def receive_usb_packets(vendor_id, product_id, tx_ids, rx_queues: List[mp.Queue]):
     print(f"Receive process started! {len(tx_ids)} node(s) registered.")
 
-    devices = get_amfitrack_devices()
+    devices = get_usb_devices(vendor_id, product_id)
     if len(devices) < 1:
         raise ConnectionError("No devices found!")
 
@@ -142,15 +154,22 @@ def receive_usb_packets(tx_ids, rx_queues: List[mp.Queue]):
 
         rx_packet = Packet(rx_data[2:])
 
+        # TODO: Check CRC of header and payload
+        if not rx_packet.header_crc_good():
+            print("Header CRC check failed!")
+
+        if not rx_packet.payload_crc_good():
+            print("Payload CRC check failed!")
+
         for index, tx_id in enumerate(tx_ids):
             if tx_id == rx_packet.source_id:
                 rx_queues[index].put(rx_packet)
 
 
-def transmit_usb_packets(tx_queue: mp.Queue):
+def transmit_usb_packets(vendor_id, product_id, tx_queue: mp.Queue):
     print("Transmit process started!")
 
-    devices = get_amfitrack_devices()
+    devices = get_usb_devices(vendor_id, product_id)
     if len(devices) < 1:
         raise ConnectionError("No devices found!")
 
@@ -165,10 +184,10 @@ def transmit_usb_packets(tx_queue: mp.Queue):
         dev.write(0x01, byte_data)
 
 
-def get_amfitrack_devices():
+def get_usb_devices(vendor_id, product_id):
     device_list = []
 
-    devices = usb.core.find(find_all=True, idVendor=0x0C17, idProduct=0x0D12)
+    devices = usb.core.find(find_all=True, idVendor=vendor_id, idProduct=product_id)
 
     if devices is None:
         raise ValueError('Device is not found')
