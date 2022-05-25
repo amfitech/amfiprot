@@ -575,10 +575,11 @@ class FirmwareStartPayload(CommonPayload):
 
     @classmethod
     def from_bytes(cls, data):
-        pass
+        processor_id = data[1]
+        return FirmwareStartPayload(processor_id)
 
     def __str__(self):
-        pass
+        return "Firmware start"
 
     def __len__(self):
         return len(self.data)
@@ -598,10 +599,12 @@ class FirmwareDataPayload(CommonPayload):
 
     @classmethod
     def from_bytes(cls, data):
-        pass
+        processor_id = data[1]
+        firmware_data = data[2:]
+        return FirmwareDataPayload(firmware_data, processor_id)
 
     def __str__(self):
-        pass
+        return "Firmware data payload: " + str(self.data)
 
     def __len__(self):
         return len(self.data)
@@ -619,10 +622,11 @@ class FirmwareEndPayload(CommonPayload):
 
     @classmethod
     def from_bytes(cls, data):
-        pass
+        processor_id = data[1]
+        return FirmwareEndPayload(processor_id)
 
     def __str__(self):
-        pass
+        return "Firmware end"
 
     def __len__(self):
         return len(self.data)

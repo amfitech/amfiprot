@@ -36,7 +36,7 @@ class Connection(ABC):
 
 
 class UsbConnection(Connection):
-    MAX_PAYLOAD_SIZE = 55
+    MAX_PAYLOAD_SIZE = 54  # 1 byte needed for CRC
 
     def __init__(self, vendor_id: int = 0x0C17, product_id: int = 0x0D12):
         self.vendor_id = vendor_id
@@ -53,6 +53,9 @@ class UsbConnection(Connection):
         self.transmit_process: mp.Process = None
         self.nodes: List[Node] = []
         self.transmit_queue: mp.Queue = mp.Queue()
+
+    def __del__(self):
+        self.stop()
 
     def find_nodes(self) -> List[Node]:
         # Create 'request device id' packet
@@ -72,10 +75,16 @@ class UsbConnection(Connection):
 
         rx_packets = []
         while time.time() - start_time < 1:
+            data = None
+
             try:
                 data = self.usb_device.read(0x81, 64)
             except usb.core.USBTimeoutError:
                 pass
+
+            if data is None:
+                continue
+
             rx_packet = Packet(data[2:])
 
             if type(rx_packet.payload) == ReplyDeviceIdPayload:
@@ -153,6 +162,7 @@ def receive_usb_packets(vendor_id, product_id, tx_ids, rx_queues: List[mp.Queue]
             continue
 
         rx_packet = Packet(rx_data[2:])
+        # print(rx_packet)
 
         # TODO: Check CRC of header and payload
         if not rx_packet.header_crc_good():
@@ -178,10 +188,13 @@ def transmit_usb_packets(vendor_id, product_id, tx_queue: mp.Queue):
     while True:
         tx_packet = tx_queue.get(block=True)
 
+        # print("Sending: " + str(tx_packet))
+
         byte_data = array.array('B', [1])
         byte_data.extend(tx_packet.to_bytes())
         byte_data.extend([0] * (64 - len(byte_data)))
-        dev.write(0x01, byte_data)
+        # bytes_written = dev.write(0x01, byte_data)
+        # print(f"{bytes_written} bytes sent.")
 
 
 def get_usb_devices(vendor_id, product_id):

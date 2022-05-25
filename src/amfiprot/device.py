@@ -124,7 +124,7 @@ class Device:
                 if new_value != parameter['value']:
                     raise ValueError(f"Could not set parameter {parameter['name']} ({parameter['uid']}). Expected {parameter['value']}, got {new_value}.")
 
-    def update_firmware(self, path_to_bin: str):
+    def update_firmware(self, path_to_bin: str, print_progress: bool = False):
         file_size = os.path.getsize(path_to_bin)
         bin_data = array.array('B')
 
@@ -133,15 +133,25 @@ class Device:
 
         # Slice array into appropriately sized payloads (depends on the connection)
         max_payload_size = self.node.max_payload_size()
-        chunks = [bin_data[i:i + max_payload_size] for i in range(0, file_size, max_payload_size)]
+        chunk_size = max_payload_size - 2
+        chunks = [bin_data[i:i + chunk_size] for i in range(0, file_size, chunk_size)]
 
         # Send firmware start command
         self.node.send_payload(FirmwareStartPayload())
+        self._await_reply(PayloadType.SUCCESS, timeout_ms=10_000)
 
         # Send data packets and receive Ack for each packet
-        for chunk in chunks:
-            self.node.send_payload(FirmwareDataPayload(chunk), packet_type=PacketType.REQUEST_ACK)
-            self._await_ack()
+        progress_timer = MilliTimer(1000, autostart=True)
+
+        for index, chunk in enumerate(chunks):
+            payload = FirmwareDataPayload(chunk)
+            self.node.send_payload(payload, packet_type=PacketType.REQUEST_ACK)
+            self._await_reply(PayloadType.SUCCESS, timeout_ms=10_000)
+
+            if progress_timer.expired():
+                progress = (index / len(chunks)) * 100
+                print(f"Firmware sent: {progress:.1f}%")
+                progress_timer.start()
 
         # Send firmware end command
         self.node.send_payload(FirmwareEndPayload())
@@ -187,8 +197,30 @@ class Device:
         while packet is None or packet.packet_type != PacketType.ACK:
             packet = self.get_packet()
 
+            if packet is not None:
+                if packet.payload_type == PayloadType.NOT_IMPLEMENTED:
+                    print("Received NOT_IMPLEMENTED packet!")
+                elif packet.payload_type == PayloadType.SUCCESS:
+                    print("Received SUCCESS")
+                elif packet.payload_type == PayloadType.FAILURE:
+                    print("Received FAILURE")
+                else:
+                    print(f"Received {packet.payload_type}")
+
             if timer.expired():
                 raise TimeoutError("Timed out waiting for Ack.")
+
+        return
+
+    def _await_reply(self, payload_type: PayloadType, timeout_ms: int = 1000):
+        packet = None
+        timer = MilliTimer(timeout_ms, autostart=True)
+
+        while packet is None or packet.payload_type != payload_type:
+            packet = self.get_packet()
+
+            if timer.expired():
+                raise TimeoutError("Packet not returned.")
 
         return
 
