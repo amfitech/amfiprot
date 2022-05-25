@@ -53,6 +53,7 @@ class UsbConnection(Connection):
         self.transmit_process: mp.Process = None
         self.nodes: List[Node] = []
         self.transmit_queue: mp.Queue = mp.Queue()
+        self.global_receive_queue: mp.Queue = mp.Queue()
 
     def __del__(self):
         self.stop()
@@ -114,7 +115,7 @@ class UsbConnection(Connection):
         tx_ids = [node.tx_id for node in self.nodes]
         rx_queues = [node.receive_queue for node in self.nodes]
 
-        self.receive_process = mp.Process(target=receive_usb_packets, args=(self.vendor_id, self.product_id, tx_ids, rx_queues))
+        self.receive_process = mp.Process(target=receive_usb_packets, args=(self.vendor_id, self.product_id, tx_ids, rx_queues, self.global_receive_queue))
         self.receive_process.start()
 
     def stop(self):
@@ -146,7 +147,7 @@ class UsbConnection(Connection):
                f" PID={product_id}, SN={serial_number}"
 
 
-def receive_usb_packets(vendor_id, product_id, tx_ids, rx_queues: List[mp.Queue]):
+def receive_usb_packets(vendor_id, product_id, tx_ids, rx_queues: List[mp.Queue], global_receive_queue: mp.Queue):
     print(f"Receive process started! {len(tx_ids)} node(s) registered.")
 
     devices = get_usb_devices(vendor_id, product_id)
@@ -170,6 +171,8 @@ def receive_usb_packets(vendor_id, product_id, tx_ids, rx_queues: List[mp.Queue]
 
         if not rx_packet.payload_crc_good():
             print("Payload CRC check failed!")
+
+        global_receive_queue.put(rx_packet)
 
         for index, tx_id in enumerate(tx_ids):
             if tx_id == rx_packet.source_id:
