@@ -20,8 +20,7 @@ class PacketDestination(enum.IntEnum):
     PC = 0
     BROADCAST = 255
 
-
-class Packet:
+class Header:
     class HeaderIndex(enum.IntEnum):
         PAYLOAD_LENGTH = 0
         """
@@ -42,23 +41,45 @@ class Packet:
         """
         SOURCE_TX_ID = 4
         DESTINATION_TX_ID = 5
-        HEADER_CRC = 6
-        """
-        CRC of the data header (not including the two byte USB header)
-        """
 
+    @classmethod
+    def length(cls):
+        return len(cls.HeaderIndex)
+
+    def __init__(self, data):
+        self.data = data
+        self.payload_length = data[self.HeaderIndex.PAYLOAD_LENGTH]
+        self.packet_type = data[self.HeaderIndex.PACKET_TYPE]
+        self.packet_number = data[self.HeaderIndex.PACKET_NUMBER]
+        self.payload_type = data[self.HeaderIndex.PAYLOAD_TYPE]
+        self.source_tx_id = data[self.HeaderIndex.SOURCE_TX_ID]
+        self.destination_tx_id = data[self.HeaderIndex.SOURCE_TX_ID]
+
+    def __len__(self):
+        return self.length()
+
+    def __str__(self):
+        return f"<Header> src: {self.source_tx_id}, dest: {self.destination_tx_id}, packet_number: {self.packet_number}"
+
+    def to_bytes(self):
+        return array.array('B', self.data)
+
+
+class Packet:
     def __init__(self, byte_data: array.array):  # Using array.array('B') since it's faster than bytearray()
         """ Init docstring """
         self.data: array.array = byte_data
-        self.header = self.data[:len(self.HeaderIndex)]
+        self.header = Header(self.data[:Header.length()])
 
-        if self.header[self.HeaderIndex.PAYLOAD_LENGTH] == 0:
+        if self.header.payload_length == 0:
             self.payload = None
         else:
-            self.payload_data = self.data[len(self.HeaderIndex):len(self.HeaderIndex)+self.payload_length]
+            payload_start_index = Header.length() + 1  # CRC
+            payload_end_index = payload_start_index + self.header.payload_length
+            payload_data = self.data[payload_start_index:payload_end_index]
 
             # Create payload object that corresponds to payload_type
-            self.payload = create_payload_from_type(self.payload_data, self.payload_type)
+            self.payload = create_payload_from_type(payload_data, self.header.payload_type)
 
     @classmethod
     def from_payload(cls, payload, destination_id, source_id=0, packet_type=PacketType.NO_ACK, packet_number: int = 0):
@@ -86,34 +107,45 @@ class Packet:
 
     @property
     def packet_type(self):
-        return self.data[self.HeaderIndex.PACKET_TYPE]
+        return self.header.packet_type
 
     @packet_type.setter
     def packet_type(self, message_type):
-        self.data[self.HeaderIndex.PACKET_TYPE] = message_type
+        self.header.packet_type = message_type
 
     @property
     def payload_length(self):
-        return self.data[self.HeaderIndex.PAYLOAD_LENGTH]
+        return self.header.payload_length
 
     @property
     def payload_type(self) -> PayloadType:
-        return self.data[self.HeaderIndex.PAYLOAD_TYPE]
+        return self.header.payload_type
 
     @property
     def source_id(self):
-        return self.data[self.HeaderIndex.SOURCE_TX_ID]
+        return self.header.source_tx_id
 
     @property
     def destination_id(self):
-        return self.data[self.HeaderIndex.DESTINATION_TX_ID]
+        return self.header.destination_tx_id
+
+    @property
+    def header_crc(self):
+        return self.data[Header.length()]
+
+    @property
+    def payload_crc(self):
+        if self.header.payload_length == 0:
+            return 0
+
+        return self.data[len(self.header) + 1 + self.header.payload_length]
 
     @destination_id.setter
     def destination_id(self, identifier):
-        self.data[self.HeaderIndex.DESTINATION_TX_ID] = identifier
+        self.header.destination_tx_id = identifier
 
     def __str__(self):
-        return f"Dest: {self.destination_id}, Src: {self.source_id}, Payload_type: {self.payload_type}: {self.payload}"
+        return f"{self.header} {self.payload}"
 
     def to_bytes(self):
         """
@@ -121,19 +153,19 @@ class Packet:
         """
         return self.data
 
-    def header_crc_good(self) -> bool:
-        header_crc = self.header[self.HeaderIndex.HEADER_CRC]
-        new_crc = calculate_crc(self.header[:self.HeaderIndex.HEADER_CRC])
-        return new_crc == header_crc
+    def crc_is_good(self) -> bool:
+        new_header_crc = calculate_crc(self.header.to_bytes())
+        header_crc_is_good = (self.header_crc == new_header_crc)
 
-    def payload_crc_good(self) -> bool:
-        if self.payload is None or self.header[self.HeaderIndex.PAYLOAD_LENGTH] == 0:
+        if not header_crc_is_good:
+            return False
+
+        if self.header.payload_length == 0:
             return True
-
-        payload_crc_index = len(self.HeaderIndex) + self.header[self.HeaderIndex.PAYLOAD_LENGTH]
-        payload_crc = self.data[payload_crc_index]
-        new_crc = calculate_crc(self.payload_data)
-        return new_crc == payload_crc
+        else:
+            print(f"Checking crc for {self.payload}")
+            new_payload_crc = calculate_crc(self.payload.to_bytes())
+            return self.payload_crc == new_payload_crc
 
 
 amfiprot_payload_mappings = {

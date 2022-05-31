@@ -203,14 +203,10 @@ def receive_usb_packets(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], glob
             continue
 
         rx_packet = Packet(rx_data[2:])
-        # print(rx_packet)
+        print(rx_packet)
 
-        # TODO: Check CRC of header and payload
-        if not rx_packet.header_crc_good():
-            print("Header CRC check failed!")
-
-        if not rx_packet.payload_crc_good():
-            print("Payload CRC check failed!")
+        # if not rx_packet.crc_is_good():
+        #     print("Packet CRC check failed!")
 
         global_receive_queue.put_nowait(rx_packet)
 
