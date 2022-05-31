@@ -1,6 +1,6 @@
 from __future__ import annotations
 import multiprocessing as mp
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Optional
 import warnings
 import time
 import os
@@ -23,7 +23,7 @@ class Device:
         self.tx_id = node.tx_id
         self.uuid = node.uuid
 
-    def id(self) -> int:
+    def id(self) -> tuple[int, int]:
         self.node.send_payload(RequestDeviceIdPayload())
         packet = self._await_packet(ReplyDeviceIdPayload)
         return packet.payload.tx_id, packet.payload.uuid
@@ -173,7 +173,7 @@ class Device:
         # FIXME: Device cannot be reached after reboot unless both `Connection` and `Device` are deleted and recreated. Maybe only if the rebooted device is physically connected via USB.
         self.node.send_payload(RebootPayload())
 
-    def get_packet(self) -> Packet:
+    def get_packet(self) -> Optional[Packet]:
         """ For specialized devices, this is where we reinterpret UndefinedPaylods as
         application-specific payload types """
         return self.node.get_packet()
@@ -235,6 +235,9 @@ class MilliTimer:
 
     def start(self):
         self.start_time = time.time_ns() // 1_000_000
+
+    def stop(self):
+        self.start_time = None
 
     def expired(self):
         if self.start_time is None:

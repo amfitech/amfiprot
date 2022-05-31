@@ -3,6 +3,7 @@ import array
 import enum
 import struct
 from abc import abstractmethod
+from typing import Type
 
 
 class CommonPayloadId(enum.IntEnum):  # When PayloadType is Common, these PayloadID's are available
@@ -592,7 +593,7 @@ class FirmwareStartPayload(CommonPayload):
 
 
 class FirmwareDataPayload(CommonPayload):
-    def __init__(self, firmware_data: tuple, processor_id: int = 0):
+    def __init__(self, firmware_data, processor_id: int = 0):
         self.data = array.array('B', [CommonPayloadId.FIRMWARE_DATA, processor_id])
         firmware_bytes = array.array('B', firmware_data)
         self.data.extend(firmware_bytes)
@@ -670,7 +671,7 @@ def decode_config_value(data_type: ConfigValueType, byte_data: array.array):
     if data_type == ConfigValueType.BOOL:
         return bool(int.from_bytes(byte_data, byteorder='little'))
     elif data_type == ConfigValueType.CHAR:
-        return byte_data.decode('ascii')
+        return byte_data.tobytes().decode('ascii')
     elif data_type in [ConfigValueType.INT8, ConfigValueType.INT16, ConfigValueType.INT32, ConfigValueType.INT64]:
         return int.from_bytes(byte_data, byteorder='little', signed=True)
     elif data_type in [ConfigValueType.UINT8, ConfigValueType.UINT16, ConfigValueType.UINT32, ConfigValueType.UINT64]:
@@ -742,9 +743,9 @@ payload_ids = {
         }
 
 
-def create_common_payload(data):
+def create_common_payload(data) -> Payload:
     payload_id = data[0]
     if payload_id in payload_ids:
-        return payload_ids[payload_id].from_bytes(data)
+        return payload_ids[payload_id].from_bytes(data)  # type: ignore
     else:
         raise ValueError(f"Payload ID {payload_id} not implemented!")

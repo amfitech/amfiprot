@@ -88,12 +88,16 @@ class Packet:
     def packet_type(self):
         return self.data[self.HeaderIndex.PACKET_TYPE]
 
+    @packet_type.setter
+    def packet_type(self, message_type):
+        self.data[self.HeaderIndex.PACKET_TYPE] = message_type
+
     @property
     def payload_length(self):
         return self.data[self.HeaderIndex.PAYLOAD_LENGTH]
 
     @property
-    def payload_type(self) -> int:
+    def payload_type(self) -> PayloadType:
         return self.data[self.HeaderIndex.PAYLOAD_TYPE]
 
     @property
@@ -107,10 +111,6 @@ class Packet:
     @destination_id.setter
     def destination_id(self, identifier):
         self.data[self.HeaderIndex.DESTINATION_TX_ID] = identifier
-
-    @packet_type.setter
-    def packet_type(self, message_type):
-        self.data[self.HeaderIndex.PACKET_TYPE] = message_type
 
     def __str__(self):
         return f"Dest: {self.destination_id}, Src: {self.source_id}, Payload_type: {self.payload_type}: {self.payload}"
@@ -137,7 +137,7 @@ class Packet:
 
 
 amfiprot_payload_mappings = {
-        PayloadType.COMMON: create_common_payload,
+        PayloadType.COMMON: create_common_payload,  # type: ignore
         PayloadType.SUCCESS: SuccessPayload,
         PayloadType.NOT_IMPLEMENTED: NotImplementedPayload,
         PayloadType.FAILURE: FailurePayload,
@@ -147,7 +147,7 @@ amfiprot_payload_mappings = {
 
 def create_payload_from_type(payload_data: array.array, payload_type: PayloadType):
     if payload_type in amfiprot_payload_mappings:
-        return amfiprot_payload_mappings[payload_type](payload_data)
+        return amfiprot_payload_mappings[payload_type](payload_data)  # type: ignore
     else:
         return UndefinedPayload(payload_data, payload_type)
 

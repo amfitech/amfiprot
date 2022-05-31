@@ -23,7 +23,7 @@ class Node:
     def available_packets(self) -> int:
         return self.receive_queue.qsize()
 
-    def get_packet(self, blocking=False, timeout_ms=1000) -> Packet:
+    def get_packet(self, blocking=False, timeout_ms=1000) -> typing.Optional[Packet]:
         if self.receive_queue.empty() and not blocking:
             return None
 
