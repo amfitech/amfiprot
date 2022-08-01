@@ -28,9 +28,9 @@ class Device:
         packet = self._await_packet(ReplyDeviceIdPayload)
         return packet.payload.tx_id, packet.payload.uuid
 
-    def firmware_version(self) -> dict:
-        self.node.send_payload(RequestFirmwareVersionPayload())
-        packet = self._await_packet(ReplyFirmwareVersionPayload)
+    def firmware_version(self, processor_id: int = 0) -> dict:
+        self.node.send_payload(RequestFirmwareVersionPerIdPayload(processor_id))
+        packet = self._await_packet(ReplyFirmwareVersionPerIdPayload)
         return packet.payload.fw_version
 
     def name(self) -> str:

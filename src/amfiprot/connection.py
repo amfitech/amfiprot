@@ -203,7 +203,7 @@ def receive_usb_packets(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], glob
             continue
 
         rx_packet = Packet(rx_data[2:])
-        print(rx_packet)
+        #print(rx_packet)
 
         # if not rx_packet.crc_is_good():
         #     print("Packet CRC check failed!")

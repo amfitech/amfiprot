@@ -220,6 +220,65 @@ class ReplyFirmwareVersionPayload(CommonPayload):
             'fw_version': self.fw_version
         }
 
+class RequestFirmwareVersionPerIdPayload(CommonPayload):
+    def __init__(self, processor_id: int = 0):
+        self.data = array.array('B', [CommonPayloadId.REQUEST_FIRMWARE_VERSION_PER_ID, processor_id])
+
+    @classmethod
+    def from_bytes(cls, data):
+        processor_id = data[1]
+        return RequestFirmwareVersionPerIdPayload(processor_id)
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.REQUEST_FIRMWARE_VERSION_PER_ID,
+            'processor_id': self.data[1]
+        }
+
+class ReplyFirmwareVersionPerIdPayload(CommonPayload):
+    SIZE = 18
+
+    def __init__(self, major: int, minor: int, patch: int, build: int, processor_id: int):
+        self.fw_version = {'major': major, 'minor': minor, 'patch': patch, 'build': build}
+        self.processor_id = processor_id
+
+    @classmethod
+    def from_bytes(cls, data):
+        major = int.from_bytes(data[1:5], byteorder='little')
+        minor = int.from_bytes(data[5:9], byteorder='little')
+        patch = int.from_bytes(data[9:13], byteorder='little')
+        build = int.from_bytes(data[13:17], byteorder='little')
+        processor_id = data[17]
+        return ReplyFirmwareVersionPerIdPayload(major, minor, patch, build, processor_id)
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"fw_version: {self.fw_version['major']}.{self.fw_version['minor']}.{self.fw_version['patch']}.{self.fw_version['build']}"
+
+    def __len__(self):
+        return self.SIZE
+
+    def to_bytes(self):
+        data = array.array('B', [CommonPayloadId.REPLY_FIRMWARE_VERSION])
+        data.extend(self.fw_version['major'].to_bytes(4, byteorder='little'))
+        data.extend(self.fw_version['minor'].to_bytes(4, byteorder='little'))
+        data.extend(self.fw_version['patch'].to_bytes(4, byteorder='little'))
+        data.extend(self.fw_version['build'].to_bytes(4, byteorder='little'))
+        data.extend(self.processor_id.to_bytes(1, byteorder='little'))
+        return data
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.REPLY_FIRMWARE_VERSION,
+            'fw_version': self.fw_version,
+            'processor_id': self.processor_id
+        }
 
 class RequestDeviceNamePayload(CommonPayload):
     def __init__(self):
@@ -831,7 +890,9 @@ payload_ids = {
             CommonPayloadId.SAVE_AS_DEFAULT: SaveAsDefaultConfigurationPayload,
             CommonPayloadId.FIRMWARE_START: FirmwareStartPayload,
             CommonPayloadId.FIRMWARE_DATA:FirmwareDataPayload,
-            CommonPayloadId.FIRMWARE_END: FirmwareEndPayload
+            CommonPayloadId.FIRMWARE_END: FirmwareEndPayload,
+            CommonPayloadId.REQUEST_FIRMWARE_VERSION_PER_ID: RequestFirmwareVersionPerIdPayload,
+            CommonPayloadId.REPLY_FIRMWARE_VERSION_PER_ID: ReplyFirmwareVersionPerIdPayload
         }
 
 
