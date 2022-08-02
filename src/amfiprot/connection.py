@@ -56,8 +56,8 @@ class UsbConnection(Connection):
         if self.usb_device is None:
             raise ConnectionError("Could not connect to device!")
 
-        self.receive_process: mp.Process
-        self.transmit_process: mp.Process
+        self.receive_process: mp.Process = None
+        self.transmit_process: mp.Process = None
         self.nodes: List[Node] = []
         self.transmit_queue: mp.Queue = mp.Queue()
         self.global_receive_queue: mp.Queue = mp.Queue()
@@ -113,22 +113,35 @@ class UsbConnection(Connection):
             try:
                 data = self.usb_device.read(0x81, 64)
             except usb.core.USBTimeoutError:
-                pass
-
-            if data is None:
+                print("USB timed out while waiting for Device ID reply packets.")
                 continue
 
             rx_packet = Packet(data[2:])
+            print(rx_packet)
 
             if type(rx_packet.payload) == ReplyDeviceIdPayload:
                 rx_packets.append(rx_packet)
 
+        nodes = []
+
         for packet in rx_packets:
             if type(packet.payload) == ReplyDeviceIdPayload:
-                uuids = [node.uuid for node in self.nodes]
+                uuids = [node.uuid for node in nodes]
                 if packet.payload.uuid not in uuids:
                     node = Node(tx_id=packet.payload.tx_id, uuid=packet.payload.uuid, connection=self)
-                    self.nodes.append(node)
+                    nodes.append(node)
+
+        if len(nodes) == 0:
+            print("No Device ID reply packets received!")
+
+        if nodes_changed(nodes, self.nodes):
+            self.nodes = nodes
+            # Send updated node list to RX/TX processes (if started)
+            if self.receive_process is not None and self.transmit_process is not None:
+                # HACK: just restart connection using new self.nodes list
+                self.stop()
+                self.start()
+            print("New node detected!")
 
         return self.nodes
 
@@ -342,3 +355,18 @@ def get_usb_device_by_hash(hash: str) -> Optional[usb.core.Device]:
                 return device
 
     return None
+
+def nodes_changed(list1: List[Node], list2):
+    # Check if lengths differ
+    if len(list1) != len(list2):
+        return True
+
+    # Sort both lists by uuid and compare each element (list equality will not work)
+    list1.sort(key=lambda x: x.uuid)
+    list2.sort(key=lambda x: x.uuid)
+
+    for (item1, item2) in zip(list1, list2):
+        if item1.uuid != item2.uuid:
+            return True
+
+    return False
