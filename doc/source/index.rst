@@ -6,6 +6,7 @@ Amfiprot Python package
    :caption: Contents:
 
    amfiprot/amfiprot
+   amfiprot/overview
 
 
 
