@@ -14,7 +14,7 @@ class PayloadType(IntEnum):
 class Payload(metaclass=ABCMeta):
     @abstractmethod
     def __len__(self) -> int:
-        """ Length of the payload in bytes (without CRC) """
+        """ Length of the payload in bytes (without the CRC byte) """
         pass
 
     @abstractmethod
@@ -24,16 +24,17 @@ class Payload(metaclass=ABCMeta):
     @property
     @abstractmethod
     def type(self) -> PayloadType:
-        """ Payload type """
+        """ Returns the payload type """
         pass
 
     @abstractmethod
     def to_bytes(self) -> array.array:
-        """ Array of raw bytes (without CRC) """
+        """ Returns the payload as an array of raw bytes (without CRC) """
         pass
     
     @abstractmethod
     def to_dict(self) -> dict:
+        """ Returns the payload as a dict """
         pass
 
 

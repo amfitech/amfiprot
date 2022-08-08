@@ -7,6 +7,7 @@ Amfiprot Python package
 
    amfiprot/amfiprot
    amfiprot/overview
+   amfiprot/extending
 
 
 
