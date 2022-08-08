@@ -19,15 +19,17 @@ Header
 ------
 The header indices are defined in the Packet.HeaderIndex enum:
 
-.. autoclass:: amfitrack.amfiprot.packet.Packet.HeaderIndex
-    :members:
-    :undoc-members:
+..
+    .. autoclass:: amfitrack.amfiprot.packet.Packet.HeaderIndex
+        :members:
+        :undoc-members:
 
 Payload
 -------
 The interpretation of the payload data depends on the payload type and the payload ID,
 which is the first byte of the payload. The different payload types are defined here:
 
-.. autoclass:: amfitrack.amfiprot.payload.PayloadType
-    :members:
-    :undoc-members:
+..
+    .. autoclass:: amfitrack.amfiprot.payload.PayloadType
+        :members:
+        :undoc-members:

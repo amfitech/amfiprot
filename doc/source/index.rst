@@ -1,4 +1,4 @@
-AmfiTrack Python library documentation
+Amfiprot Python package
 ======================================
 
 .. toctree::

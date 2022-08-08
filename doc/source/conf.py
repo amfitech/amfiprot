@@ -17,8 +17,8 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'AmfiTrack'
-copyright = '2022, Kristian Klein-Wengel'
+project = 'Amfiprot'
+copyright = '2022, Amfitech'
 author = 'Kristian Klein-Wengel'
 
 # The full version, including alpha/beta/rc tags
@@ -34,7 +34,7 @@ import os, sys
 # print(sys.path)
 # print(os.getcwd())
 sys.path.insert(0, os.path.abspath('../../src'))
-sys.path.append(os.path.abspath('../../src/amfitrack/amfiprot'))
+sys.path.append(os.path.abspath('../../src/amfiprot'))
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
