@@ -43,16 +43,12 @@ class Connection(ABC):
         """ Returns the maximum size (in bytes) of the payload (not the entire packet) for the connection. """
         pass
 
-class DeviceNotFoundError(ConnectionError):
-    pass
-
 
 class UsbConnection(Connection):
     MAX_PAYLOAD_SIZE = 54  # 1 byte needed for CRC
 
     def __init__(self, vendor_id: int, product_id: int, serial_number: int = None):  # Cannot just pass the usb.core.Device, because we need to be able to re-establish connection if the device is temporarily lost
-        """ If no serial number is given, the first device that matches vendor_id and product_id is used.
-        If no product_id is given, the first device that matches vendor_id is used. """
+        """ If no serial number is given, the first device that matches vendor_id and product_id is used. """
         self.vendor_id = vendor_id
         self.product_id = product_id
         self.usb_serial_number = serial_number
@@ -119,11 +115,11 @@ class UsbConnection(Connection):
             try:
                 data = self.usb_device.read(0x81, 64)
             except usb.core.USBTimeoutError:
-                print("USB timed out while waiting for Device ID reply packets.")
+                #print("USB timed out while waiting for Device ID reply packets.")
                 continue
 
             rx_packet = Packet(data[2:])
-            print(rx_packet)
+            #print(rx_packet)
 
             if type(rx_packet.payload) == ReplyDeviceIdPayload:
                 rx_packets.append(rx_packet)
@@ -137,8 +133,8 @@ class UsbConnection(Connection):
                     node = Node(tx_id=packet.payload.tx_id, uuid=packet.payload.uuid, connection=self)
                     nodes.append(node)
 
-        if len(nodes) == 0:
-            print("No Device ID reply packets received!")
+        # if len(nodes) == 0:
+        #     print("No Device ID reply packets received!")
 
         if nodes_changed(nodes, self.nodes):
             self.nodes = nodes
@@ -147,7 +143,7 @@ class UsbConnection(Connection):
                 # HACK: just restart connection using new self.nodes list
                 self.stop()
                 self.start()
-            print("New node detected!")
+            # print("New node detected!")
 
         return self.nodes
 
@@ -239,7 +235,8 @@ def receive_usb_packets(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], glob
                 index = tx_ids.index(rx_packet.source_id)  # .index returns ValueError if value not found in list
                 rx_queues[index].put_nowait(rx_packet)
             except ValueError:
-                print("Packet TxID does not match any nodes.")
+                # print("Packet TxID does not match any nodes.")
+                pass
 
         elif state == ConnectionState.DISCONNECTED:
             print("Reconnecting...")

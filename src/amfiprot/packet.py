@@ -37,7 +37,7 @@ class Header:
         """
         PAYLOAD_TYPE = 3
         """
-        See :class:`amfitrack.amfiprot.payload.PayloadType`
+        See :class:`amfiprot.payload.PayloadType`
         """
         SOURCE_TX_ID = 4
         DESTINATION_TX_ID = 5
@@ -67,7 +67,6 @@ class Header:
 
 class Packet:
     def __init__(self, byte_data: array.array):  # Using array.array('B') since it's faster than bytearray()
-        """ Init docstring """
         self.data: array.array = byte_data
         self.header = Header(self.data[:Header.length()])
 
@@ -149,7 +148,7 @@ class Packet:
 
     def to_bytes(self):
         """
-        Convert packet to array.array('B') for transmission
+        Convert packet to an array of bytes (array.array('B')) for transmission
         """
         return self.data
 
@@ -163,7 +162,7 @@ class Packet:
         if self.header.payload_length == 0:
             return True
         else:
-            print(f"Checking crc for {self.payload}")
+            # print(f"Checking crc for {self.payload}")
             new_payload_crc = calculate_crc(self.payload.to_bytes())
             return self.payload_crc == new_payload_crc
 

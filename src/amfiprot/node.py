@@ -12,7 +12,7 @@ if typing.TYPE_CHECKING:
 class Node:
     """ A `Node` represents a single endpoint on a `Connection`. One `Connection` can
     have multiple nodes, e.g. if the PC connects via USB to a device which in turn is connected
-    to additional devices via RF """
+    to additional devices via RF. """
     def __init__(self, tx_id, uuid, connection: Connection):
         self.connection = connection
         self.tx_id = tx_id
@@ -27,12 +27,7 @@ class Node:
         if self.receive_queue.empty() and not blocking:
             return None
 
-        # start_time = time.time_ns() / 1000
-        # while self.receive_queue.empty() and (time.time_ns()/1000) - start_time < timeout_ms:
-        #     self.connection.process()
-        #
-        # if self.receive_queue.empty():
-        #     return None
+        # TODO: Implement timeout
 
         return self.receive_queue.get()
 

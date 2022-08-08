@@ -1,13 +1,10 @@
 from __future__ import annotations
-import multiprocessing as mp
 from typing import List, TYPE_CHECKING, Optional
 import warnings
 import time
 import os
-from abc import ABC
 from .packet import Packet, PacketType
 from .common_payload import *
-from .payload import UndefinedPayload
 
 if TYPE_CHECKING:
     from .node import Node
@@ -16,8 +13,8 @@ if TYPE_CHECKING:
 class Device:
     """ High-level interface to a physical device. This is an abstraction layer on top of the `Node` class.
     For low-level access (i.e. sending custom packets or payloads) it is possible to use `Device.node` directly.
-    Do note, that `Device.node.get_packet` does not have any knowledge of application-specific payload IDs. Thus,
-    to interpret the payloads correctly, always use `Device.get_packet` to read packets. """
+    """
+
     def __init__(self, node: Node):
         self.node = node
         self.tx_id = node.tx_id
@@ -70,9 +67,6 @@ class Device:
             return packet.payload.config_value, packet.payload.data_type
         else:
             return packet.payload.config_value
-
-    def config_value_from_index(self, index):
-        pass
 
     def read_config(self) -> List[dict]:
         config = []
@@ -170,7 +164,6 @@ class Device:
         self.node.send_payload(payload)
 
     def reboot(self):
-        # FIXME: Device cannot be reached after reboot unless both `Connection` and `Device` are deleted and recreated. Maybe only if the rebooted device is physically connected via USB.
         self.node.send_payload(RebootPayload())
 
     def get_packet(self) -> Optional[Packet]:
@@ -196,16 +189,6 @@ class Device:
 
         while packet is None or packet.packet_type != PacketType.ACK:
             packet = self.get_packet()
-
-            if packet is not None:
-                if packet.payload_type == PayloadType.NOT_IMPLEMENTED:
-                    print("Received NOT_IMPLEMENTED packet!")
-                elif packet.payload_type == PayloadType.SUCCESS:
-                    print("Received SUCCESS")
-                elif packet.payload_type == PayloadType.FAILURE:
-                    print("Received FAILURE")
-                else:
-                    print(f"Received {packet.payload_type}")
 
             if timer.expired():
                 raise TimeoutError("Timed out waiting for Ack.")
