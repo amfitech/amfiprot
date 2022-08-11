@@ -53,13 +53,13 @@ class Header:
         self.packet_number = data[self.HeaderIndex.PACKET_NUMBER]
         self.payload_type = data[self.HeaderIndex.PAYLOAD_TYPE]
         self.source_tx_id = data[self.HeaderIndex.SOURCE_TX_ID]
-        self.destination_tx_id = data[self.HeaderIndex.SOURCE_TX_ID]
+        self.destination_tx_id = data[self.HeaderIndex.DESTINATION_TX_ID]
 
     def __len__(self):
         return self.length()
 
     def __str__(self):
-        return f"<Header> src: {self.source_tx_id}, dest: {self.destination_tx_id}, packet_number: {self.packet_number}"
+        return f"<Header> src: {self.source_tx_id}, dest: {self.destination_tx_id}, payload_type: {self.payload_type}, packet_number: {self.packet_number}"
 
     def to_bytes(self):
         return array.array('B', self.data)
