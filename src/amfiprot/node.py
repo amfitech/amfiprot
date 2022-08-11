@@ -17,7 +17,7 @@ class Node:
         self.connection = connection
         self.tx_id = tx_id
         self.uuid = uuid
-        self.receive_queue: mp.Queue = mp.Queue(maxsize=128)
+        self.receive_queue: mp.Queue = mp.Queue()
         self.packet_number = 0
 
     def available_packets(self) -> int:

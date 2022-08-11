@@ -228,12 +228,19 @@ def receive_usb_packets(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], glob
             # if not rx_packet.crc_is_good():
             #     print("Packet CRC check failed!")
 
-            global_receive_queue.put_nowait(rx_packet)  # TODO: What if queue is full? Should probably only keep newest packets
+            if global_receive_queue.full():
+                print("Global receive queue full! Packet discarded.")
+            else:
+                global_receive_queue.put_nowait(rx_packet)  # TODO: What if queue is full? Should probably only keep newest packets
 
             # Push packet to correct rx_queue
             try:
                 index = tx_ids.index(rx_packet.source_id)  # .index returns ValueError if value not found in list
-                rx_queues[index].put_nowait(rx_packet)
+                if rx_queues[index].full():
+                    print(f"RX queue [TxID {tx_ids[index]}] full! Packet discarded.")
+                else:
+                    rx_queues[index].put_nowait(rx_packet)
+
             except ValueError:
                 # print("Packet TxID does not match any nodes.")
                 pass
