@@ -3,7 +3,7 @@ import amfiprot
 
 
 def main():
-    conn = amfiprot.UsbConnection()
+    conn = amfiprot.UsbConnection(0xc17, 0xd12)
     nodes = conn.find_nodes()
 
     if len(nodes) == 0:

@@ -22,7 +22,7 @@ copyright = '2022, Amfitech'
 author = 'Kristian Klein-Wengel'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1a0'
+release = '0.0.1a1'
 
 
 # -- General configuration ---------------------------------------------------
