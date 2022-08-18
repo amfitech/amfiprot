@@ -31,9 +31,12 @@ class Device:
         return packet.payload.fw_version
 
     def name(self) -> str:
-        self.node.send_payload(RequestDeviceNamePayload())
-        packet = self._await_packet(ReplyDeviceNamePayload)
-        return packet.payload.name
+        if self.node.name is None:
+            self.node.send_payload(RequestDeviceNamePayload())
+            packet = self._await_packet(ReplyDeviceNamePayload)
+            self.node.name = packet.payload.name
+
+        return self.node.name
 
     def config_category_count(self):
         self.node.send_payload(RequestCategoryCountPayload())

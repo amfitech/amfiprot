@@ -9,7 +9,7 @@ import enum
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from .packet import Packet, PacketDestination
-from .common_payload import RequestDeviceIdPayload, ReplyDeviceIdPayload
+from .common_payload import RequestDeviceIdPayload, ReplyDeviceIdPayload, RequestDeviceNamePayload, ReplyDeviceNamePayload
 from .node import Node
 from .device import MilliTimer
 
@@ -93,6 +93,8 @@ class UsbConnection(Connection):
         return device_list
 
     def find_nodes(self) -> List[Node]:
+        # TODO: Clean this method. Implement helper functions for blocking send/receive
+
         # Create 'request device id' packet
         payload = RequestDeviceIdPayload()
         packet = Packet.from_payload(payload, destination_id=PacketDestination.BROADCAST)
@@ -133,9 +135,40 @@ class UsbConnection(Connection):
                     node = Node(tx_id=packet.payload.tx_id, uuid=packet.payload.uuid, connection=self)
                     nodes.append(node)
 
-        # if len(nodes) == 0:
-        #     print("No Device ID reply packets received!")
+        # Request device name for all found nodes
+        for node in nodes:
+            payload = RequestDeviceNamePayload()
+            packet = Packet.from_payload(payload, destination_id=node.tx_id)
 
+            # Send packet via USB
+            bytes_to_transmit: array.array = array.array('B', [1])  # USB header Report ID, packet length only required on IN packets (???)
+            bytes_to_transmit.extend(packet.to_bytes())
+
+            while len(bytes_to_transmit) < 64:
+                bytes_to_transmit.append(0)
+
+            self.usb_device.write(0x1, bytes_to_transmit, 1000)
+
+            start_time = time.time()
+
+            while time.time() - start_time < 1:
+                data = None
+
+                try:
+                    data = self.usb_device.read(0x81, 64)
+                except usb.core.USBTimeoutError:
+                    # print("USB timed out while waiting for Device ID reply packets.")
+                    continue
+
+                rx_packet = Packet(data[2:])
+                # print(rx_packet)
+
+                if type(rx_packet.payload) == ReplyDeviceNamePayload:
+                    node.name = rx_packet.payload.name
+                    break
+
+
+        # Restart connection if nodes list changed
         if nodes_changed(nodes, self.nodes):
             self.nodes = nodes
             # Send updated node list to RX/TX processes (if started)
