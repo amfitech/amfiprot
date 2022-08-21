@@ -1,5 +1,5 @@
 import array
-
+import sys
 import _queue
 import usb.core
 import usb.util
@@ -15,6 +15,7 @@ from .common_payload import RequestDeviceIdPayload, ReplyDeviceIdPayload, Reques
 from .node import Node
 from .device import MilliTimer
 from .connection import Connection
+import os
 
 USB_HID_REPORT_LENGTH = 64
 
@@ -29,12 +30,13 @@ class UsbConnection(Connection):
         self.usb_serial_number = serial_number
 
         self.usb_device = get_matching_device(vendor_id, product_id, serial_number)
-
+        print(f"Backend: {self.usb_device.backend}")
         if self.usb_device is None:
             raise ConnectionError("Could not connect to device!")
 
         self.receive_process: mp.Process = None
         self.transmit_process: mp.Process = None
+        self.usb_task: mp.Process = None
         self.nodes: List[Node] = []
         self.transmit_queue: mp.Queue = mp.Queue()
         self.global_receive_queue: mp.Queue = mp.Queue()
@@ -164,20 +166,32 @@ class UsbConnection(Connection):
 
     def start(self):
         usb_device_hash = generate_device_hash(self.usb_device)
+        self.usb_device.reset()
+        usb.util.dispose_resources(self.usb_device)
+        del self.usb_device
 
         # Create tx process
-        self.transmit_process = mp.Process(target=transmit_usb_packets, args=(usb_device_hash, self.transmit_queue, self.usb_connection_lost))
-        self.transmit_process.start()
+        # self.transmit_process = mp.Process(target=transmit_usb_packets, args=(usb_device_hash, self.transmit_queue, self.usb_connection_lost))
+        # self.transmit_process.start()
 
         # Create rx process
         tx_ids = [node.tx_id for node in self.nodes]
         rx_queues = [node.receive_queue for node in self.nodes]
 
-        self.receive_process = mp.Process(target=receive_usb_packets, args=(usb_device_hash, tx_ids, rx_queues, self.global_receive_queue, self.usb_connection_lost))
-        self.receive_process.start()
+        # self.receive_process = mp.Process(target=receive_usb_packets, args=(usb_device_hash, tx_ids, rx_queues, self.global_receive_queue, self.usb_connection_lost))
+        # self.receive_process.start()
+        self.usb_task = mp.Process(target=usb_task, args=(usb_device_hash, tx_ids, rx_queues, self.transmit_queue, self.global_receive_queue))
+        self.usb_task.start()
         time.sleep(1)  # To allow processes to start up
 
     def stop(self):
+        if self.usb_task is not None:
+            if self.usb_task.is_alive():
+                self.usb_task.terminate()
+                self.usb_task.join()
+
+        return
+
         if self.receive_process.is_alive():
             self.receive_process.terminate()
             self.receive_process.join()
@@ -211,12 +225,104 @@ class ConnectionState(enum.IntEnum):
     CONNECTED = 1
     DISCONNECTED = 2
 
+def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Queue, global_receive_queue: mp.Queue):
+    IN_ENDPOINT = 0x81
+    OUT_ENDPOINT = 0x01
+
+    print("USB subprocess started.")
+    dev = get_usb_device_by_hash(usb_device_hash)
+    # print(dev)
+    print(f"Task Backend: {dev.backend}")
+    state = ConnectionState.CONNECTED
+
+    while True:
+        if state == ConnectionState.CONNECTED:
+            # Try to receive
+            try:
+                rx_data = dev.read(IN_ENDPOINT, USB_HID_REPORT_LENGTH, timeout=1)
+            except usb.core.USBTimeoutError as e:
+                # print(e)
+                continue
+            except usb.core.USBError as e:
+                print("DEVICE CONNECTION LOST!")
+                print(e)
+                print("Waiting 2 seconds before reconnecting.")
+
+                usb.util.dispose_resources(dev)
+                del dev
+                # dev = None
+                state = ConnectionState.DISCONNECTED
+                time.sleep(2)
+                continue
+
+            rx_packet = Packet(rx_data[2:])
+            # print(rx_packet)
+
+            # if not rx_packet.crc_is_good():
+            #     print("Packet CRC check failed!")
+
+            if global_receive_queue.full():
+                print("Global receive queue full! Packet discarded.")
+            else:
+                global_receive_queue.put_nowait(
+                    rx_packet)  # TODO: What if queue is full? Should probably only keep newest packets
+
+            # Push packet to correct rx_queue
+            try:
+                index = tx_ids.index(rx_packet.source_id)  # .index returns ValueError if value not found in list
+                if rx_queues[index].full():
+                    print(f"RX queue [TxID {tx_ids[index]}] full! Packet discarded.")
+                else:
+                    rx_queues[index].put_nowait(rx_packet)
+
+            except ValueError:
+                # print("Packet TxID does not match any nodes.")
+                pass
+
+            # Send all pending packets
+            if not tx_queue.empty():
+                tx_packet = tx_queue.get_nowait()
+
+                byte_data = array.array('B', [1])
+                byte_data.extend(tx_packet.to_bytes())
+                byte_data.extend([0] * (64 - len(byte_data)))
+                try:
+                    bytes_written = dev.write(OUT_ENDPOINT, byte_data, timeout=1)
+                except usb.core.USBError as e:  # TODO: Check disconnect in some other way before getting from tx_queue, because this drops packets!
+                    print(f"Could not send packet ({e})")
+                    continue
+        elif state == ConnectionState.DISCONNECTED:
+            print("Reconnecting...")
+
+            devices = usb.core.find(find_all=True)
+            for device in devices:
+                try:
+                    print(device.product)
+                except Exception:
+                    pass
+
+            os.system("lsusb")
+
+            time.sleep(5)
+            continue
+
+            dev = get_usb_device_by_hash(usb_device_hash)
+            print(f"Device: {dev}")
+
+            if dev is not None:
+                print("Connection re-established!")
+                state = ConnectionState.CONNECTED
+            else:
+                time.sleep(1)
+        else:
+            raise ValueError("Invalid state in USB task.")
 
 def receive_usb_packets(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], global_receive_queue: mp.Queue, usb_connection_lost: mp.Event):
     IN_ENDPOINT = 0x81
 
     print(f"Receive process started! {len(tx_ids)} node(s) registered.")
     dev = get_usb_device_by_hash(usb_device_hash)
+    dev.reset()
     state = ConnectionState.CONNECTED
 
     while True:
@@ -225,9 +331,10 @@ def receive_usb_packets(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], glob
                 rx_data = dev.read(IN_ENDPOINT, USB_HID_REPORT_LENGTH, 1000)
             except usb.core.USBTimeoutError:
                 continue
-            except usb.core.USBError:
+            except usb.core.USBError as e:
+                print(e)
                 print(f"[RX] Lost connection to {dev.product}.")
-                usb_connection_lost.set()
+                #usb_connection_lost.set()
                 dev = None
                 state = ConnectionState.DISCONNECTED
                 continue
@@ -333,7 +440,13 @@ def connect_usb(vendor_id, product_id, serial_number = None):
         raise ConnectionError("Could not reconnect")
 
     dev = devices[0]
-    dev.set_configuration()
+
+    if "linux" in sys.platform.lower():
+        for config in dev:
+            for i in range(config.bNumInterfaces):
+                if dev.is_kernel_driver_active(i):
+                    dev.detach_kernel_driver(i)
+
     return dev
 
 
@@ -345,7 +458,7 @@ def get_serial_number(device: usb.core.Device) -> int:
     return usb.util.get_string(device, device.iSerialNumber)
 
 def get_matching_device(vendor_id, product_id, serial_number) -> usb.core.Device:
-    device = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+    device: usb.core.Device = usb.core.find(idVendor=vendor_id, idProduct=product_id)
 
     if device is None:
         raise ConnectionError("No match!")
@@ -355,6 +468,12 @@ def get_matching_device(vendor_id, product_id, serial_number) -> usb.core.Device
         if current_serial == serial_number:
             return device
     else:
+        device.reset()
+
+        if "linux" in sys.platform.lower():
+            print("Host is Linux")
+            linux_usb_workaround(device)
+        # device.set_configuration()
         return device
 
     return None
@@ -368,10 +487,16 @@ def generate_device_hash(device: usb.core.Device) -> str:
     return hash.hexdigest()
 
 def get_usb_device_by_hash(hash: str) -> Optional[usb.core.Device]:
+    print(usb.core.show_devices())
     devices = list(usb.core.find(find_all=True))
 
     if len(devices) > 0:
         for device in devices:
+            try:
+                print(device.product)
+            except Exception:
+                pass
+
             try:
                 current_hash = generate_device_hash(device)
             except ValueError:
@@ -380,6 +505,15 @@ def get_usb_device_by_hash(hash: str) -> Optional[usb.core.Device]:
                 continue
 
             if hash == current_hash:
+
+                # if "linux" in sys.platform.lower():
+                #     print("Host is Linux!")
+                #     for config in device:
+                #         for i in range(config.bNumInterfaces):
+                #             if device.is_kernel_driver_active(i):
+                #                 device.detach_kernel_driver(i)
+                # device.set_configuration()
+
                 return device
 
     return None
@@ -398,3 +532,10 @@ def nodes_changed(list1: List[Node], list2):
             return True
 
     return False
+
+
+def linux_usb_workaround(device):
+    for config in device:
+        for i in range(config.bNumInterfaces):
+            if device.is_kernel_driver_active(i):
+                device.detach_kernel_driver(i)

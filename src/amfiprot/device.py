@@ -181,6 +181,9 @@ class Device:
         while packet is None or type(packet.payload) != payload_class:
             packet = self.get_packet()
 
+            if packet is not None:
+                print(packet)
+
             if timer.expired():
                 raise TimeoutError("Packet not returned.")
 
