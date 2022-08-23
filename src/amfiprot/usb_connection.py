@@ -98,6 +98,9 @@ class UsbConnection(Connection):
                 #print("USB timed out while waiting for Device ID reply packets.")
                 continue
 
+            if len(data) == 0:  # Extra safe guard for Linux (or previous libusb version??)
+                continue
+
             rx_packet = Packet(data[2:])
             #print(rx_packet)
 
@@ -247,6 +250,9 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
                 usb.util.dispose_resources(dev)
                 del dev
                 state = ConnectionState.DISCONNECTED
+                continue
+
+            if len(rx_data) == 0:
                 continue
 
             rx_packet = Packet(rx_data[2:])
