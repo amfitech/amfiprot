@@ -239,6 +239,20 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
 
     while True:
         if state == ConnectionState.CONNECTED:
+
+            # Send all pending packets
+            if not tx_queue.empty():
+                tx_packet = tx_queue.get_nowait()
+
+                byte_data = array.array('B', [1])
+                byte_data.extend(tx_packet.to_bytes())
+                byte_data.extend([0] * (64 - len(byte_data)))
+                try:
+                    bytes_written = dev.write(OUT_ENDPOINT, byte_data, timeout=1)
+                except usb.core.USBError as e:  # TODO: Check disconnect in some other way before getting from tx_queue, because this drops packets!
+                    print(f"Could not send packet ({e})")
+                    continue
+
             # Try to receive
             try:
                 rx_data = dev.read(IN_ENDPOINT, USB_HID_REPORT_LENGTH, timeout=1)
@@ -279,18 +293,6 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
                 # print("Packet TxID does not match any nodes.")
                 pass
 
-            # Send all pending packets
-            if not tx_queue.empty():
-                tx_packet = tx_queue.get_nowait()
-
-                byte_data = array.array('B', [1])
-                byte_data.extend(tx_packet.to_bytes())
-                byte_data.extend([0] * (64 - len(byte_data)))
-                try:
-                    bytes_written = dev.write(OUT_ENDPOINT, byte_data, timeout=1)
-                except usb.core.USBError as e:  # TODO: Check disconnect in some other way before getting from tx_queue, because this drops packets!
-                    print(f"Could not send packet ({e})")
-                    continue
         elif state == ConnectionState.DISCONNECTED:
             print("Reconnecting...")
 
