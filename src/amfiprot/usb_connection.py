@@ -188,6 +188,8 @@ class UsbConnection(Connection):
         time.sleep(1)  # To allow processes to start up
 
     def stop(self):
+        # TODO: Send stop request to task and wait for acknowledge (allows outbound packets to be sent before stopping)
+
         if self.usb_task is not None:
             if self.usb_task.is_alive():
                 self.usb_task.terminate()
@@ -248,7 +250,7 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
                 byte_data.extend(tx_packet.to_bytes())
                 byte_data.extend([0] * (64 - len(byte_data)))
                 try:
-                    bytes_written = dev.write(OUT_ENDPOINT, byte_data, timeout=1)
+                    bytes_written = dev.write(OUT_ENDPOINT, byte_data, timeout=1000) # TODO: Do something about this timeout! It was 1 ms before in order not to block reading, but sometimes it is not enough time to actually send the packet.
                 except usb.core.USBError as e:  # TODO: Check disconnect in some other way before getting from tx_queue, because this drops packets!
                     print(f"Could not send packet ({e})")
                     continue
@@ -307,7 +309,7 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
             raise ValueError("Invalid state in USB task.")
 
 
-def connect_usb(vendor_id, product_id, serial_number = None):
+def connect_usb(vendor_id, product_id, serial_number=None):
     for i in range(3):
         try:
             devices = get_usb_devices(vendor_id, product_id)

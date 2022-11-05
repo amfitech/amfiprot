@@ -782,7 +782,7 @@ class FirmwareEndPayload(CommonPayload):
 class SetConfigurationValueUidPayload(CommonPayload):
     def __init__(self, uid, value, data_type):
         self.config_uid = uid
-        self.config_value = encode_config_value(value, data_type)
+        self.config_value = value
         self.data_type = data_type
 
     @classmethod
