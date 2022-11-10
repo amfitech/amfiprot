@@ -5,7 +5,8 @@ if TYPE_CHECKING:
     from .device import Device
 
 from .common_payload import *
-
+from .packet import PacketType
+import math
 
 class Configurator:
     def __init__(self, device):
@@ -28,45 +29,19 @@ class Configurator:
         return config
 
     def write_all(self, config):
-        # Check config
-        # for parameter in config:
-        #     keys = parameter.keys()
-        #     if 'name' not in keys or 'uid' not in keys or 'value' not in keys:
-        #         raise ValueError(
-        #             "Invalid configuration format. Expected list of dicts, each containing "
-        #             "the keys 'name', 'uid' and 'value'.")
-
         # Write all parameters
         for category in config:
             for parameter in category['parameters']:
-                # Read back the parameter in order to 1. check that it exists and 2. get the value type
                 try:
-                    value, data_type = self.read(parameter['uid'], return_datatype=True)
-                except TimeoutError:
+                    self.write(parameter['uid'], parameter['value'])
+                except ValueError:
                     warnings.warn(f"Parameter \"{parameter['name']}\" ({parameter['uid']}) does not exist on device")
-                    continue
-
-                # print(f"{parameter['name']} read as {value}")
-
-                # Set value
-                self.set_config_value(parameter['uid'], parameter['value'], data_type)
-
-                # print(f"{parameter['name']} set to {parameter['value']}")
-
-                # Read it back again, to ensure that it is set
-                new_value = self.config_value_from_uid(parameter['uid'])
-
-                # print(f"{parameter['name']} read as {new_value}")
-
-                if new_value != parameter['value']:
-                    raise ValueError(
-                        f"Could not set parameter {parameter['name']} ({parameter['uid']}). Expected {parameter['value']}, got {new_value}.")
 
     def read(self, uid, return_datatype: bool = False) -> Union[int, float, bool, str]:
         self.device.node.send_payload(RequestConfigurationValueUidPayload(uid))
         packet = self.device._await_packet(ReplyConfigurationValueUidPayload)
 
-        if packet.payload.uid != uid:
+        if packet.payload.uid != uid:  # Does this ever happen?
             warnings.warn("Config UIDs did not match. Trying again...")
             packet = self.device._await_packet(ReplyConfigurationValueUidPayload)
 
@@ -75,8 +50,19 @@ class Configurator:
         else:
             return packet.payload.config_value
 
-    def write(self, uid, value, data_type):  # TODO: data_type should be inferred automatically. It's a hassle to have to provide it in an interactive prompt.
+    def write(self, uid, value) -> Union[int, float, bool, str]:
+        try:
+            old_value, data_type = self.read(uid, return_datatype=True)
+        except TimeoutError:
+            raise ValueError(f"Parameter does not exist on target (UID: {uid}).")
+
+        if type(value) != type(old_value):
+            raise ValueError(f"Data type mismatch (given {type(value)}, expected {type(old_value)}).")
+
         self.device.node.send_payload(SetConfigurationValueUidPayload(uid, value, data_type))
+        response = self.device._await_packet(ReplyConfigurationValueUidPayload)
+
+        return response.payload.config_value
 
     def reset_to_default(self):
         self.device.node.send_payload(LoadDefaultConfigurationPayload())
@@ -102,4 +88,4 @@ class Configurator:
         return packet.payload.configuration_name, packet.payload.configuration_uid
 
     def __save_current_config_as_default(self):
-        pass
+        raise NotImplementedError

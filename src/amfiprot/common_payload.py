@@ -638,7 +638,7 @@ class ReplyConfigurationValueUidPayload(CommonPayload):
         return ReplyConfigurationValueUidPayload(uid, value, value_type)
 
     def __str__(self):
-        class_prefix = super().__str__() + ""
+        class_prefix = super().__str__() + " "
         return class_prefix + f"config_value: {self.config_value}"
 
     def __len__(self):
