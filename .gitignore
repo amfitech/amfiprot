@@ -8,3 +8,4 @@ venv/
 *.pkl
 *.csv
 doc/build/
+/temp/
