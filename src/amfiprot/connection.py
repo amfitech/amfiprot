@@ -31,6 +31,10 @@ class Connection(ABC):
         """ Stops the subprocesses that were created when invoking start(). """
         pass
 
+    def refresh(self):
+        """ Inform the connection that e.g. a previously registered node has changed """
+        pass
+
     @abstractmethod
     def enqueue_packet(self, packet: Packet):
         """ Enqueue a packet for transmission. """

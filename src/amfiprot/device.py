@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional
 import time
 import os
 from .packet import Packet, PacketType
@@ -17,13 +17,15 @@ class Device:
 
     def __init__(self, node: Node):
         self.node = node
-        self.tx_id = node.tx_id
-        self.uuid = node.uuid
         self.config = Configurator(self)
 
-    def id(self) -> tuple[int, int]:
+    def get_tx_id_uuid(self) -> tuple[int, int]:
         self.node.send_payload(RequestDeviceIdPayload())
         packet = self._await_packet(ReplyDeviceIdPayload)
+
+        self.node.tx_id = packet.payload.tx_id
+        self.node.uuid = packet.payload.uuid
+
         return packet.payload.tx_id, packet.payload.uuid
 
     def firmware_version(self, processor_id: int = 0) -> dict:
@@ -71,18 +73,26 @@ class Device:
         # Send firmware end command
         self.node.send_payload(FirmwareEndPayload())
 
-    def set_tx_id(self, tx_id):
-        payload = SetTxIdPayload(array.array('B', [tx_id]))
+    def set_tx_id(self, tx_id) -> bool:
+        payload = SetTxIdPayload(tx_id, self.node.uuid)
         self.node.send_payload(payload)
+
+        # Connection must be informed of new tx_id
+        self.node.tx_id = tx_id
+        self.node.connection.refresh()
+
+        # Read back tx_id to ensure that it is set
+        new_tx_id, uuid = self.get_tx_id_uuid()
+        return new_tx_id == tx_id
 
     def reboot(self):
         self.node.send_payload(RebootPayload())
 
     def packet_available(self) -> bool:
-        return not self.node.receive_queue.empty()
+        return self.node.packet_available()
 
     def get_packet(self) -> Optional[Packet]:
-        """ For specialized devices, this is where we reinterpret UndefinedPaylods as
+        """ For specialized devices, this is where we reinterpret UndefinedPayloads as
         application-specific payload types """
         return self.node.get_packet()
 

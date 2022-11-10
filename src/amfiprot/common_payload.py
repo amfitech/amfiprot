@@ -138,30 +138,35 @@ class ReplyDeviceIdPayload(CommonPayload):
 
 
 class SetTxIdPayload(CommonPayload):
-    SIZE = 2
+    SIZE = 14
 
-    def __init__(self, tx_id):
+    def __init__(self, tx_id, uuid):
         self.tx_id = tx_id
+        self.uuid = uuid
 
     @classmethod
     def from_bytes(cls, data):
         tx_id = data[1]
-        return SetTxIdPayload(tx_id)
+        uuid = int.from_bytes(data[2:14], byteorder='little')
+        return SetTxIdPayload(tx_id, uuid)
 
     def __len__(self):
         return self.SIZE
 
     def __str__(self):
         class_prefix = super().__str__() + " "
-        return class_prefix + f"tx_id: {self.tx_id}"
+        return class_prefix + f"tx_id: {self.tx_id}, uuid: {self.uuid}"
 
     def to_bytes(self):
-        return array.array('B', [CommonPayloadId.SET_TX_ID, self.tx_id])
+        data = array.array('B', [CommonPayloadId.SET_TX_ID, self.tx_id])
+        data.extend(self.uuid.to_bytes(12, byteorder='little'))
+        return data
 
     def to_dict(self):
         return {
             'payload_id': CommonPayloadId.SET_TX_ID,
-            'tx_id': self.tx_id
+            'tx_id': self.tx_id,
+            'uuid': self.uuid
         }
 
 
@@ -868,6 +873,7 @@ def encode_config_value(value, data_type: ConfigValueType):
 
 
 payload_ids = {
+            CommonPayloadId.SET_TX_ID: SetTxIdPayload,
             CommonPayloadId.REQUEST_DEVICE_ID: RequestDeviceIdPayload,
             CommonPayloadId.REPLY_DEVICE_ID: ReplyDeviceIdPayload,
             CommonPayloadId.REQUEST_DEVICE_NAME: RequestDeviceNamePayload,

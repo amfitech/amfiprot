@@ -21,8 +21,8 @@ class Node:
         self.packet_number = 0
         self.name = None
 
-    def available_packets(self) -> int:
-        return self.receive_queue.qsize()
+    def packet_available(self) -> bool:
+        return not self.receive_queue.empty()  # Do not use qsize() as it is unreliable, and not supported on Mac
 
     def get_packet(self, blocking=False, timeout_ms=1000) -> typing.Optional[Packet]:
         if self.receive_queue.empty() and not blocking:
@@ -57,4 +57,4 @@ class Node:
         return self.connection.max_payload_size()
 
     def __str__(self):
-        return f"<Node> name: {self.name}, tx_id: {self.tx_id}, uuid: {self.uuid:024x}"
+        return f"<Node> name: {self.name}, tx_id: {self.tx_id}, uuid: 0x{self.uuid:024X}"
