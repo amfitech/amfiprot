@@ -243,7 +243,7 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
         if state == ConnectionState.CONNECTED:
 
             # Send all pending packets
-            if not tx_queue.empty():
+            while not tx_queue.empty():
                 tx_packet = tx_queue.get_nowait()
 
                 byte_data = array.array('B', [1])

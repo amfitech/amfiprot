@@ -63,7 +63,7 @@ class Device:
             self.node.send_payload(payload, packet_type=PacketType.REQUEST_ACK)
             self._await_reply(PayloadType.SUCCESS, timeout_ms=10_000)
 
-            if progress_timer.expired():
+            if progress_timer.expired() and print_progress:
                 progress = (index / len(chunks)) * 100
                 print(f"Firmware sent: {progress:.1f}%")
                 progress_timer.start()

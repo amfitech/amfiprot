@@ -9,3 +9,5 @@ venv/
 *.csv
 doc/build/
 /temp/
+*.bin
+*.json
