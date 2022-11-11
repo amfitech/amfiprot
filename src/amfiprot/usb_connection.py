@@ -16,6 +16,7 @@ from .node import Node
 from .device import MilliTimer
 from .connection import Connection
 import os
+import atexit
 
 USB_HID_REPORT_LENGTH = 64
 
@@ -174,6 +175,8 @@ class UsbConnection(Connection):
         usb.util.dispose_resources(self.usb_device)
         del self.usb_device
 
+        atexit.register(connection_exit_handler, self)
+
         # Create tx process
         # self.transmit_process = mp.Process(target=transmit_usb_packets, args=(usb_device_hash, self.transmit_queue, self.usb_connection_lost))
         # self.transmit_process.start()
@@ -306,7 +309,7 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
                     rx_queues_local[index].put_nowait(rx_packet)
 
             except ValueError:
-                print(f"Packet TxID {rx_packet.source_id} does not match any nodes.")
+                # print(f"Packet TxID {rx_packet.source_id} does not match any nodes.")
                 pass
 
         elif state == ConnectionState.DISCONNECTED:
@@ -440,3 +443,7 @@ def linux_usb_workaround(device):
         for i in range(config.bNumInterfaces):
             if device.is_kernel_driver_active(i):
                 device.detach_kernel_driver(i)
+
+
+def connection_exit_handler(connection):
+    connection.stop()
