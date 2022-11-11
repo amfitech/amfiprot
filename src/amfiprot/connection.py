@@ -1,17 +1,7 @@
-import array
-import usb.core
-import usb.util
-import multiprocessing as mp
-import time
-import crcmod
-import hashlib
-import enum
 from abc import ABC, abstractmethod
-from typing import List, Optional
-from .packet import Packet, PacketDestination
-from .common_payload import RequestDeviceIdPayload, ReplyDeviceIdPayload, RequestDeviceNamePayload, ReplyDeviceNamePayload
+from typing import List
+from .packet import Packet
 from .node import Node
-from .device import MilliTimer
 
 
 class Connection(ABC):

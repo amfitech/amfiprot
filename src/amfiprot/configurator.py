@@ -1,12 +1,7 @@
-from typing import List, Union, Tuple, TYPE_CHECKING
 import warnings
-
-if TYPE_CHECKING:
-    from .device import Device
-
+from typing import List, Union, Tuple
 from .common_payload import *
-from .packet import PacketType
-import math
+
 
 class Configurator:
     def __init__(self, device):

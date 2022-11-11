@@ -1,22 +1,17 @@
 import array
 import sys
-import _queue
 import usb.core
 import usb.util
 import multiprocessing as mp
 import time
-import crcmod
 import hashlib
 import enum
-from abc import ABC, abstractmethod
+import atexit
 from typing import List, Optional
 from .packet import Packet, PacketDestination
 from .common_payload import RequestDeviceIdPayload, ReplyDeviceIdPayload, RequestDeviceNamePayload, ReplyDeviceNamePayload
 from .node import Node
-from .device import MilliTimer
 from .connection import Connection
-import os
-import atexit
 
 USB_HID_REPORT_LENGTH = 64
 
@@ -177,16 +172,10 @@ class UsbConnection(Connection):
 
         atexit.register(connection_exit_handler, self)
 
-        # Create tx process
-        # self.transmit_process = mp.Process(target=transmit_usb_packets, args=(usb_device_hash, self.transmit_queue, self.usb_connection_lost))
-        # self.transmit_process.start()
-
         # Create rx process
         tx_ids = [node.tx_id for node in self.nodes]
         rx_queues = [node.receive_queue for node in self.nodes]
 
-        # self.receive_process = mp.Process(target=receive_usb_packets, args=(usb_device_hash, tx_ids, rx_queues, self.global_receive_queue, self.usb_connection_lost))
-        # self.receive_process.start()
         self.usb_task = mp.Process(target=usb_task, args=(usb_device_hash, tx_ids, rx_queues, self.transmit_queue, self.global_receive_queue, self.node_update_queue))
         self.usb_task.start()
         time.sleep(1)  # To allow processes to start up
@@ -199,23 +188,12 @@ class UsbConnection(Connection):
                 self.usb_task.terminate()
                 self.usb_task.join()
 
-        return
-
-        if self.receive_process.is_alive():
-            self.receive_process.terminate()
-            self.receive_process.join()
-
-        if self.transmit_process.is_alive():
-            self.transmit_process.terminate()
-            self.transmit_process.join()
-
     def refresh(self):
         #rx_queues = [node.receive_queue for node in self.nodes]  # Cannot send queues in a queue to other process
         tx_ids = [node.tx_id for node in self.nodes]
         self.node_update_queue.put({'tx_ids': tx_ids})
 
     def __str__(self):
-        # print(device)
         bus = self.usb_device.bus
         address = self.usb_device.address
 
@@ -289,10 +267,6 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
                 continue
 
             rx_packet = Packet(rx_data[2:])
-            # print(rx_packet)
-
-            # if not rx_packet.crc_is_good():
-            #     print("Packet CRC check failed!")
 
             if global_receive_queue.full():
                 print("Global receive queue full! Packet discarded.")
