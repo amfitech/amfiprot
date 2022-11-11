@@ -1,13 +1,18 @@
-.idea/
-.mypy_cache/
+# Python / PyCharm
+/.idea/
+/.mypy_cache/
+/venv/
 __pycache__/
-venv/
 *.egg-info/
-*.mp3
-*.wav
-*.pkl
-*.csv
+
+# Sphinx
 doc/build/
+
+# Distribution files
+/dist/
+
+# Other files
 /temp/
+*.csv
 *.bin
 *.json
