@@ -17,7 +17,7 @@ class Configurator:
 
         for cat_index in range(self._get_category_count()):
             category_name = self._get_category_name(cat_index)
-            category = {'category': category_name, 'parameters': []}
+            category = {'name': category_name, 'parameters': []}
 
             for param_index in range(self._get_parameter_count(cat_index)):
                 name, uid = self._get_parameter_name_uid(cat_index, param_index)
