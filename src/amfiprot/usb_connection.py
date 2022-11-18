@@ -221,10 +221,18 @@ class ConnectionState(enum.IntEnum):
 def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Queue, global_receive_queue: mp.Queue, node_update_queue: mp.Queue):
     IN_ENDPOINT = 0x81
     OUT_ENDPOINT = 0x01
+    RETRY_LIMIT = 10
 
-    print("USB subprocess started.")
-    dev = get_usb_device_by_hash(usb_device_hash)
-    state = ConnectionState.CONNECTED
+    retry_count = 0
+    dev = None
+
+    while dev is None:
+        dev = get_usb_device_by_hash(usb_device_hash)
+        state = ConnectionState.CONNECTED
+
+        retry_count = retry_count + 1
+        if retry_count > RETRY_LIMIT and dev is None:
+            raise ConnectionError("Subprocess could not find device.")
 
     tx_ids_local = tx_ids
     rx_queues_local = rx_queues
