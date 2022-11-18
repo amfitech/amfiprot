@@ -20,6 +20,7 @@ class PacketDestination(enum.IntEnum):
     PC = 0
     BROADCAST = 255
 
+
 class Header:
     class HeaderIndex(enum.IntEnum):
         PAYLOAD_LENGTH = 0

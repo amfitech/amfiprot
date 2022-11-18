@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
     print(f"Found {len(nodes)} node(s).")
     for node in nodes:
-        print(f"[{node.id}] {node.name}")
+        print(f"[{node.tx_id}] {node.name}")
 
     dev = amfiprot.Device(nodes[0])
     conn.start()

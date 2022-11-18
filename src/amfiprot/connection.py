@@ -21,6 +21,7 @@ class Connection(ABC):
         """ Stops the subprocesses that were created when invoking start(). """
         pass
 
+    @abstractmethod
     def refresh(self):
         """ Inform the connection that e.g. a previously registered node has changed """
         pass
