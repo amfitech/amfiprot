@@ -1,15 +1,9 @@
-Amfiprot Python package
-======================================
+.. title:: Amfiprot Documentation
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   amfiprot/amfiprot
-   amfiprot/overview
-   amfiprot/extending
-
-
+.. include:: toc_getting_started.rst
+.. include:: toc_users_guide.rst
+.. include:: toc_examples.rst
+.. include:: toc_developers_guide.rst
 
 Indices and tables
 ==================
