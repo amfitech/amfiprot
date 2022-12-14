@@ -1,5 +1,5 @@
 __all__ = ['connection', 'usb_connection', 'device', 'packet', 'payload', 'common_payload']
-__version__ = '0.0.1a1'
+__version__ = '0.0.1a2'
 
 from .payload import Payload, PayloadType
 from .node import Node
