@@ -9,7 +9,10 @@ Amfiprot is a communication protocol for embedded devices used and developed by 
 
 ## Windows
 
-Get a libusb Windows binary from https://libusb.info/.
+Get a libusb Windows binary from https://libusb.info/. From the downloaded archive, copy the following two files:
+
+- `VS2015-x64\dll\libusb-1.0.dll` to `C:\Windows\System32`
+- ``VS2015-Win32\dll\libusb-1.0.dll` to `C:\Windows\SysWOW64`
 
 Install (or update) `amfiprot` with `pip`:
 
