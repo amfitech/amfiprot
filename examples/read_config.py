@@ -1,48 +1,33 @@
-import json
 import amfiprot
 
+if __name__ == '__main__':
+    physical_devices = amfiprot.UsbConnection.scan_physical_devices()
+    conn = None
 
-def main():
-    conn = amfiprot.UsbConnection(0xc17, 0xd12)
+    for dev in physical_devices:
+        #print(dev)
+        if "amfitrack" in dev['product'].lower():
+            conn = amfiprot.UsbConnection(dev['vid'], dev['pid'])
+
+    if conn is None:
+        raise ConnectionError("No Amfitrack devices found on USB.")
+
     nodes = conn.find_nodes()
 
-    if len(nodes) == 0:
-        raise ConnectionError("No devices found!")
-
-    print("Found nodes:")
-    for node in nodes:
-        print(node)
-    print("")
+    if len(nodes) < 1:
+        raise ConnectionError("No nodes found.")
 
     dev = amfiprot.Device(nodes[0])
 
-    print(f"Connected to device with ID: {dev.tx_id}")
-
     conn.start()
 
-    device_name = dev.name()
-    print(f"Device name: {device_name}\n")
+    cfg = dev.config.read_all(flat_list=True)
 
-    fw_version = dev.firmware_version()
-    print(f"Firmware version: {fw_version['major']}.{fw_version['minor']}.{fw_version['patch']}.{fw_version['build']}")
+    # for param in cfg:
+    #     if param['uid'] == 1651667736:
+    #         param['value'] = not param['value']
+    #         break
 
-    config = dev.read_config()
-    for category in config:
-        for parameter in category['parameters']:
-            print(parameter)
-
-    # Write to JSON file
-    with open('read.json', 'w', encoding='utf8') as out_file:
-        json.dump(config, out_file, indent=4)
-
-    # Read from JSON file and write to target
-    # with open('new_config.json', 'r', encoding='utf8') as in_file:
-    #     new_config = json.load(in_file)
-    #     dev.write_config(new_config)
+    dev.config.write_all(cfg)
 
     conn.stop()
-    return 0
-
-
-if __name__ == '__main__':
-    main()

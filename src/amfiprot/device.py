@@ -72,7 +72,6 @@ class Device:
 
         # Send firmware end command
         self.node.send_payload(FirmwareEndPayload())
-        time.sleep(1)  # Ensure that last payload gets sent before user closes connection.
 
     def set_tx_id(self, tx_id) -> bool:
         payload = SetTxIdPayload(tx_id, self.node.uuid)

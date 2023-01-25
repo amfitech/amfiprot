@@ -182,6 +182,7 @@ class UsbConnection(Connection):
 
     def stop(self):
         # TODO: Send stop request to task and wait for acknowledge (allows outbound packets to be sent before stopping)
+        time.sleep(1)  # To allow pending tx packets to be sent
 
         if self.usb_task is not None:
             if self.usb_task.is_alive():
