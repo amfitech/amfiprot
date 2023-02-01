@@ -1,9 +1,8 @@
-from .payload import Payload, PayloadType
+from .payload import Payload
 import array
 import enum
 import struct
 from abc import abstractmethod
-from typing import Type
 
 
 class CommonPayloadId(enum.IntEnum):  # When PayloadType is Common, these PayloadID's are available
