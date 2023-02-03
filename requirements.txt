@@ -1,6 +1,4 @@
 alabaster==0.7.12
--e git+git@bitbucket.org:Amfitech/amfiprot_py_pkg.git@2aab9f04a4c8bc36595e76d2c94c3263ffd32b68#egg=amfiprot
-amfiprot-amfitrack @ file:///D:/Code/amfitrack/amfiprot_py_pkg/amfiprot_amfitrack-0.0.1a1-py3-none-any.whl
 astroid==2.11.5
 asttokens==2.0.5
 async-timeout==4.0.2
