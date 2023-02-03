@@ -1,10 +1,10 @@
 __all__ = ['connection', 'usb_connection', 'device', 'packet', 'payload', 'common_payload']
-__version__ = '0.0.1a3'
+__version__ = '0.1.0'
 
 from .payload import Payload, PayloadType
 from .node import Node
 from .packet import Packet
 from .device import Device
 from .connection import Connection
-from .usb_connection import UsbConnection
+from .usb_connection import USBConnection
 from .common_payload import *

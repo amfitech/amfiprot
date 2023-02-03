@@ -2,47 +2,49 @@
 Extending the protocol for a custom device
 ******************************************
 
-The :code:`amfiprot` package can be extended to support additional types of :code:`Connections` and :code:`Device`\ s
+The :code:`amfiprot` package can be extended to support additional types of :code:`Connection`\ s and :code:`Device`\ s
 (with accompanying :code:`Payload`\ s).
 
 Implementing a new Connection
 =============================
-
-Adding additional connections is done by creating a subclass of :code:`Connection` that implements all abstract
-methods:
-
-.. autoclass:: amfiprot.connection.Connection
-        :members:
-        :undoc-members:
+Adding additional connections is done by creating a subclass of :class:`amfiprot.Connection` that implements all
+its abstract methods.
 
 Implementing a new Device
 =========================
-When implementing a new Device class, it is recommended to inherit all the basic Amfiprot functionality (such as
-requesting device ID, reading and setting configuration parameters and updating firmware) by subclassing the
-:code:`amfiprot.Device` class and then adding additional functionality on top of that. If the basic Amfiprot functionality
-is not needed, subclassing the :code:`amfiprot.Device` is not strictly necessary but it may still be used for inspiration.
+In order to inherit all the basic Amfiprot functionality, specialized devices should be implemented as a subclass of
+:class:`amfiprot.Device`.
 
-If a new :code:`Device` also features new payload types (which it most likely does), the device must watch for Packets
-containing UndefinedPayloads and then attempt to reinterpret these payloads for the new payload types.
+If a new :code:`Device` also features new payload types (which is often the case), the device must watch for
+:code:`Packet`\ s containing :code:`UndefinedPayload`\ s and then attempt to reinterpret these payloads for any newly
+implemented payload types. This should be done by overriding the :meth:`amfiprot.Device.get_packet` function.
 
 Implementing a new Payload
 ==========================
 
-A new payload type is created as a class that implements the :code:`Payload` interface:
+To create a new payload type, you must create a subclass of the :code:`Payload` interface, implementing all its
+abstract methods:
 
 .. autoclass:: amfiprot.payload.Payload
         :members:
         :undoc-members:
         :special-members: __str__, __len__
 
-Now you are able to *send* packets containing your new payload type. As long as the new payload type is a subclass of
-:code:`Payload`, it can be converted to an array of bytes for transmission, and thus the specific payload type does not
-matter.
+After creating this subclass, you are now able to *send* packets containing your new payload type:
 
-However, when receiving packets with a payload type that is not defined in the Amfiprot built-in payload types, the
-payload will be interpreted as an UndefinedPayload. This payload can then be reinterpreted as the newly created payload type
-(given that the payload type in the packet header matches). This can be done manually by the user or (more elegantly) by
-implementing a new Device class that has knowledge of this payload type.
+.. code-block::
+
+    payload = MyNewPayload(some_variable)
+    dev.node.send_payload(payload, source_id=252)
+
+As long as the new payload type is a subclass of :code:`Payload` (and thus implements the
+:meth:`amfiprot.Payload.to_bytes()` method), it can be converted to an array of bytes for transmission, and thus the
+specific payload type does not matter.
+
+When receiving packets, any payload type that is not defined in the core Amfiprot package will be created as an
+:code:`UndefinedPayload`. If the packet's payload type matches your newly implemented payload, it is your responsibility
+to reinterpret the packet. If you have also implemented a new :code:`Device` then it should be done by overriding
+:meth:`amfiprot.Device.get_packet`.
 
 Select a payload type identifier between 0-255 that is not already in use. The built-in Amfiprot payload types are
 defined here:

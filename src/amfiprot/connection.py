@@ -5,6 +5,8 @@ from .node import Node
 
 
 class Connection(ABC):
+    """Interface for connecting to a root node."""
+
     @abstractmethod
     def find_nodes(self) -> List[Node]:
         """ Searches for Amfiprot-compatible nodes on the Connection and returns a list of Node objects. """

@@ -1,9 +1,12 @@
-************************************
-Setting up a development environment
-************************************
+*****************************
+Development environment setup
+*****************************
 
-For developers
---------------
+.. admonition:: Tip
+
+    It is highly recommended to use PyCharm as your IDE, because it is specifically made for Python and thus has
+    excellent code completion, real-time syntax checking and makes it easier to work with a virtual environment.
+
 After cloning the repository, create a virtual environment and activate it:
 
 .. code-block::
@@ -11,8 +14,8 @@ After cloning the repository, create a virtual environment and activate it:
     python -m venv .\venv
     .\venv\Scripts\activate.bat
 
-In the virtual environment, install packages from `requirements.txt` and then install the `amfiprot` package itself
-with the 'editable' option:
+With virtual environment activated, install all packages from :code:`requirements.txt` and then install the :code:`amfiprot`
+package itself with the 'editable' option:
 
 .. code-block::
 
@@ -20,4 +23,4 @@ with the 'editable' option:
     pip install -e .
 
 Now you can edit the source code and try out the changes immediately in your virtual environment without needing to
-reinstall the package.
+reinstall the package every time.

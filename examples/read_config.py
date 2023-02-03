@@ -1,7 +1,7 @@
 import amfiprot
 
 if __name__ == '__main__':
-    physical_devices = amfiprot.UsbConnection.scan_physical_devices()
+    physical_devices = amfiprot.UsbConnection.discover()
     conn = None
 
     for dev in physical_devices:

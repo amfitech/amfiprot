@@ -52,9 +52,9 @@ pipeline {
         bat """
           call .\\venv\\Scripts\\activate.bat
           call .\\doc\\make.bat html
+          xcopy .\\doc\\build\\html C:\\wamp64\\www\\amfiprot_py /E /I /Y
         """
       }
     }
   }
 }
-

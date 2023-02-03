@@ -33,7 +33,7 @@ def get_version(rel_path):
 # -- Project information -----------------------------------------------------
 
 project = 'Amfiprot'
-copyright = '2022, Amfitech'
+copyright = '2023, Amfitech'
 author = 'Kristian Klein-Wengel'
 
 # The full version, including alpha/beta/rc tags

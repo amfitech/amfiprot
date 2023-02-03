@@ -1,8 +1,8 @@
 What is Amfiprot?
 =================
 Amfiprot is a communication protocol for embedded devices used and developed by `Amfitech <https://www.amfitech.dk/>`_.
-The protocol can be extended with plugins for specific devices implementing the Amfiprot protocol (e.g. the
-`AmfiTrack <https://www.amfitrack.com/>`_).
+The protocol can be extended with plugins for specific devices implementing (and possibly extending) the Amfiprot
+protocol (e.g. the `AmfiTrack <https://www.amfitrack.com/>`_).
 
 Installation
 ============
@@ -10,20 +10,29 @@ Installation
 Prerequisites
 -------------
 
-- Python 3.6 or higher.
+- Python 3.7 or higher.
 - `libusb <https://libusb.info/>`_ in order to communicate with USB devices through :code:`pyusb`
 
 
 Windows
 -------
 
-Get a libusb Windows binary from https://libusb.info/.
+Get a libusb Windows binary from https://libusb.info/. From the downloaded archive, copy the following two files:
+
+- :code:`VS2015-x64\dll\libusb-1.0.dll` to :code:`C:\Windows\System32`
+- :code:`VS2015-Win32\dll\libusb-1.0.dll` to :code:`C:\Windows\SysWOW64`
+
 
 Install (or update) :code:`amfiprot` with :code:`pip`:
 
 .. code-block:: shell
 
     pip install -U amfiprot
+
+
+.. admonition:: Tip
+
+    If you plan on interfacing with an AmfiTrack device, also install the :code:`amfiprot-amfitrack` extension package.
 
 Linux (Ubuntu)
 --------------
@@ -61,6 +70,9 @@ Finally, install (or update) :code:`amfiprot` with :code:`pip`:
 
     pip install -U amfiprot
 
+.. admonition:: Tip
+
+    If you plan on interfacing with an AmfiTrack device, also install the :code:`amfiprot-amfitrack` extension package.
 
 Basic usage
 =============
@@ -83,7 +95,7 @@ Example:
     PRODUCT_ID = 0xD12
 
     if __name__ == "__main__":
-        conn = amfiprot.UsbConnection(VENDOR_ID, PRODUCT_ID)
+        conn = amfiprot.USBConnection(VENDOR_ID, PRODUCT_ID)
         nodes = conn.find_nodes()
 
         print(f"Found {len(nodes)} node(s).")
@@ -98,5 +110,3 @@ Example:
         while True:
             if dev.packet_available():
                 print(dev.get_packet())
-
-.. The following sections provide a more in-depth explanation.

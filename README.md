@@ -97,7 +97,7 @@ The following sections provide a more in-depth explanation.
 After attaching a device to your host machine, you can scan for connected devices (e.g. connected via USB) with:
 
 ```python
-phys_devs = amfiprot.UsbConnection.scan_physical_devices()
+phys_devs = amfiprot.UsbConnection.discover()
 
 for dev in phys_devs:
     print(dev)

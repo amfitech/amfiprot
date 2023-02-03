@@ -16,7 +16,8 @@ from .connection import Connection
 USB_HID_REPORT_LENGTH = 64
 
 
-class UsbConnection(Connection):
+class USBConnection(Connection):
+    """An implementation of :class:`amfiprot.Connection` used to connect to USB HID devices."""
     MAX_PAYLOAD_SIZE = 54  # 1 byte needed for CRC
 
     def __init__(self, vendor_id: int, product_id: int, serial_number: str = None):
@@ -46,7 +47,7 @@ class UsbConnection(Connection):
             pass  # Processes not started
 
     @classmethod
-    def scan_physical_devices(cls):
+    def discover(cls):
         devices = usb.core.find(find_all=True)
         device_list = []
 
