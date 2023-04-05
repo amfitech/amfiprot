@@ -113,7 +113,8 @@ class ReplyDeviceIdPayload(CommonPayload):
     @classmethod
     def from_bytes(cls, data):
         tx_id = data[1]
-        uuid = int.from_bytes(data[2:14], byteorder='little')
+        #uuid = int.from_bytes(data[2:14], byteorder='little')
+        uuid = int.from_bytes(data[10:14]+data[6:10]+data[2:6], byteorder='little') #To match previous output
         return ReplyDeviceIdPayload(tx_id, uuid)
 
     def __len__(self):
