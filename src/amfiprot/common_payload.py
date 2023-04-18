@@ -685,7 +685,7 @@ class LoadDefaultConfigurationPayload(CommonPayload):
 
 class SaveAsDefaultConfigurationPayload(CommonPayload):
     def __init__(self):
-        self.data = array.array('B', CommonPayloadId.SAVE_AS_DEFAULT)
+        self.data = array.array('B', [CommonPayloadId.SAVE_AS_DEFAULT])
 
     @classmethod
     def from_bytes(cls, data):
