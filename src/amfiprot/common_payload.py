@@ -38,6 +38,7 @@ class CommonPayloadId(enum.IntEnum):  # When PayloadType is Common, these Payloa
     REPLY_FIRMWARE_VERSION_PER_ID = 0x1D
     DEBUG_OUTPUT = 0x20
     REBOOT = 0x21
+    RESET_PARAMETER = 0x24
 
 
 class ConfigValueType(enum.IntEnum):
@@ -353,6 +354,26 @@ class RebootPayload(CommonPayload):
             'payload_id': self.data[0]
         }
 
+class ResetParameterPayload(CommonPayload):
+    def __init__(self, ResetParameter: int = 0):
+        self.data = array.array('B', [CommonPayloadId.RESET_PARAMETER, ResetParameter])
+
+    @classmethod
+    def from_bytes(cls, data):
+        ResetParameter = data[1]
+        return RequestFirmwareVersionPerIdPayload(ResetParameter)
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.RESET_PARAMETER,
+            'resetParameter_id': self.data[1]
+        }
 
 class RequestCategoryCountPayload(CommonPayload):
     def __init__(self):
@@ -898,7 +919,8 @@ payload_ids = {
             CommonPayloadId.FIRMWARE_DATA:FirmwareDataPayload,
             CommonPayloadId.FIRMWARE_END: FirmwareEndPayload,
             CommonPayloadId.REQUEST_FIRMWARE_VERSION_PER_ID: RequestFirmwareVersionPerIdPayload,
-            CommonPayloadId.REPLY_FIRMWARE_VERSION_PER_ID: ReplyFirmwareVersionPerIdPayload
+            CommonPayloadId.REPLY_FIRMWARE_VERSION_PER_ID: ReplyFirmwareVersionPerIdPayload,
+            CommonPayloadId.RESET_PARAMETER: ResetParameterPayload
         }
 
 
