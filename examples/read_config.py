@@ -1,33 +1,40 @@
 import amfiprot
 
 if __name__ == '__main__':
-    physical_devices = amfiprot.UsbConnection.discover()
+    physical_devices = amfiprot.USBConnection.discover()
     conn = None
 
     for dev in physical_devices:
         #print(dev)
         if "amfitrack" in dev['product'].lower():
-            conn = amfiprot.UsbConnection(dev['vid'], dev['pid'])
+            conn = amfiprot.USBConnection(dev['vid'], dev['pid'])
+            if (conn):
+                nodes = conn.find_nodes()
+
+                print("USB device: {} ({})".format(conn.usb_device.product, conn.usb_device.serial_number))
+                if len(nodes) < 1:
+                    print("  No nodes found.")
+                
+                for node in nodes:
+                    dev = amfiprot.Device(node)
+                    conn.start()
+
+                    cfg = dev.config.read_all()
+                    for category in cfg:
+                        print("  {}".format(category['name']))
+                        for item in category['parameters']:
+                            print("    {} = {}".format(item['name'], item['value']))
+                print()
 
     if conn is None:
         raise ConnectionError("No Amfitrack devices found on USB.")
 
-    nodes = conn.find_nodes()
 
-    if len(nodes) < 1:
-        raise ConnectionError("No nodes found.")
-
-    dev = amfiprot.Device(nodes[0])
-
-    conn.start()
-
-    cfg = dev.config.read_all(flat_list=True)
+    # Changing a parameter can be done by:
 
     # for param in cfg:
-    #     if param['uid'] == 1651667736:
+    #     if param['uid'] == 1651667736:    # RF hub
     #         param['value'] = not param['value']
     #         break
 
-    dev.config.write_all(cfg)
-
-    conn.stop()
+    #dev.config.write_all(cfg)
