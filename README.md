@@ -73,7 +73,7 @@ VENDOR_ID = 0xC17
 PRODUCT_ID = 0xD12
 
 if __name__ == "__main__":
-    conn = amfiprot.UsbConnection(VENDOR_ID, PRODUCT_ID)
+    conn = amfiprot.USBConnection(VENDOR_ID, PRODUCT_ID)
     nodes = conn.find_nodes()
 
     print(f"Found {len(nodes)} node(s).")
@@ -97,7 +97,7 @@ The following sections provide a more in-depth explanation.
 After attaching a device to your host machine, you can scan for connected devices (e.g. connected via USB) with:
 
 ```python
-phys_devs = amfiprot.UsbConnection.discover()
+phys_devs = amfiprot.USBConnection.discover()
 
 for dev in phys_devs:
     print(dev)
@@ -106,7 +106,7 @@ for dev in phys_devs:
 A connection can then be created using a specific physical device:
 
 ```python
-conn = amfiprot.UsbConnection(dev['vid'], dev['pid'], dev['serial_number'])
+conn = amfiprot.USBConnection(dev['vid'], dev['pid'], dev['serial_number'])
 ```
 
 Using `serial_number` is optional. If none is given, the first device matching the given vendor and product ID is used.
