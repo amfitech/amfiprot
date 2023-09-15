@@ -14,10 +14,11 @@ if __name__ == '__main__':
                 print("USB device: {} ({})".format(conn.usb_device.product, conn.usb_device.serial_number))
                 if len(nodes) < 1:
                     print("  No nodes found.")
-                
+
+                conn.start()
+                                
                 for node in nodes:
                     dev = amfiprot.Device(node)
-                    conn.start()
 
                     cfg = dev.config.read_all()
                     for category in cfg:

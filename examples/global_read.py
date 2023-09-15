@@ -5,7 +5,7 @@ PRODUCT_ID_SENSOR = 0xD12
 PRODUCT_ID_SOURCE = 0xD01
 
 def main():
-    conn = amfiprot.USBConnection(VENDOR_ID, PRODUCT_ID_SOURCE)
+    conn = amfiprot.USBConnection(VENDOR_ID, PRODUCT_ID_SENSOR)
     conn.start()
 
     while True:

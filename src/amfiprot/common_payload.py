@@ -285,6 +285,36 @@ class ReplyFirmwareVersionPerIdPayload(CommonPayload):
             'fw_version': self.fw_version,
             'processor_id': self.processor_id
         }
+    
+
+class DebugOutputPayload(CommonPayload):
+    def __init__(self, debug_message: str):
+        self.debug_message = debug_message
+
+    @classmethod
+    def from_bytes(cls, data):
+        debug_message = byte_array_to_string(data[1:])
+        return DebugOutputPayload(debug_message)
+
+    def __len__(self):
+        return len(self.debug_message) + 2
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"debug_message: {self.debug_message}"
+
+    def to_bytes(self):
+        arr = array.array('B', [CommonPayloadId.DEBUG_OUTPUT])
+        arr.extend(self.debug_message.encode('ascii'))
+        arr.append(0)
+        return arr
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.DEBUG_OUTPUT,
+            'debug_message': self.debug_message
+        }
+
 
 class RequestDeviceNamePayload(CommonPayload):
     def __init__(self):
@@ -920,6 +950,7 @@ payload_ids = {
             CommonPayloadId.FIRMWARE_END: FirmwareEndPayload,
             CommonPayloadId.REQUEST_FIRMWARE_VERSION_PER_ID: RequestFirmwareVersionPerIdPayload,
             CommonPayloadId.REPLY_FIRMWARE_VERSION_PER_ID: ReplyFirmwareVersionPerIdPayload,
+            CommonPayloadId.DEBUG_OUTPUT: DebugOutputPayload,
             CommonPayloadId.RESET_PARAMETER: ResetParameterPayload
         }
 
