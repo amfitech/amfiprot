@@ -262,7 +262,7 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
 
             # Try to receive
             try:
-                rx_data = dev.read(IN_ENDPOINT, USB_HID_REPORT_LENGTH, timeout=1)
+                rx_data = dev.read(IN_ENDPOINT, USB_HID_REPORT_LENGTH, timeout=0)
             except usb.core.USBTimeoutError as e:
                 # print(e)
                 continue
