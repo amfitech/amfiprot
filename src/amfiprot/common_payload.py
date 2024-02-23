@@ -757,7 +757,7 @@ class SaveAsDefaultConfigurationPayload(CommonPayload):
         return class_prefix + f"uuid: {self.uuid}"
 
     def to_bytes(self):
-        data = array.array('B', CommonPayloadId.SAVE_AS_DEFAULT)
+        data = array.array('B', [CommonPayloadId.SAVE_AS_DEFAULT])
         data.extend(self.uuid.to_bytes(12, byteorder='little'))
         return data
 
