@@ -118,8 +118,7 @@ class ReplyDeviceIdPayload(CommonPayload):
     @classmethod
     def from_bytes(cls, data):
         tx_id = data[1]
-        #uuid = int.from_bytes(data[2:14], byteorder='little')
-        uuid = int.from_bytes(data[10:14]+data[6:10]+data[2:6], byteorder='little') #To match previous output
+        uuid = int.from_bytes(data[10:14] + data[6:10] + data[2:6], byteorder='little')     # Reorder uint32 blocks, to match earlier formatting of UUID
         return ReplyDeviceIdPayload(tx_id, uuid)
 
     def __len__(self):
@@ -130,8 +129,11 @@ class ReplyDeviceIdPayload(CommonPayload):
         return class_prefix + f"tx_id: {self.tx_id}, uuid: {self.uuid:024x}"
 
     def to_bytes(self):
+        uuid_as_bytes = self.uuid.to_bytes(12, byteorder='little')
         data = array.array('B', [CommonPayloadId.REPLY_DEVICE_ID, self.tx_id])
-        data.extend(self.uuid.to_bytes(12, byteorder='little'))
+        data.extend(uuid_as_bytes[8:12])                                                     # Reorder uint32 blocks, to match earlier formatting of UUID
+        data.extend(uuid_as_bytes[4:8])
+        data.extend(uuid_as_bytes[0:4])
         return data
 
     def to_dict(self):
@@ -152,7 +154,7 @@ class SetTxIdPayload(CommonPayload):
     @classmethod
     def from_bytes(cls, data):
         tx_id = data[1]
-        uuid = int.from_bytes(data[2:14], byteorder='little')
+        uuid = int.from_bytes(data[10:14] + data[6:10] + data[2:6], byteorder='little')     # Reorder uint32 blocks, to match earlier formatting of UUID
         return SetTxIdPayload(tx_id, uuid)
 
     def __len__(self):
@@ -160,11 +162,14 @@ class SetTxIdPayload(CommonPayload):
 
     def __str__(self):
         class_prefix = super().__str__() + " "
-        return class_prefix + f"tx_id: {self.tx_id}, uuid: {self.uuid}"
+        return class_prefix + f"tx_id: {self.tx_id}, uuid: {self.uuid:024x}"
 
     def to_bytes(self):
+        uuid_as_bytes = self.uuid.to_bytes(12, byteorder='little')
         data = array.array('B', [CommonPayloadId.SET_TX_ID, self.tx_id])
-        data.extend(self.uuid.to_bytes(12, byteorder='little'))
+        data.extend(uuid_as_bytes[8:12])                                                     # Reorder uint32 blocks, to match earlier formatting of UUID
+        data.extend(uuid_as_bytes[4:8])
+        data.extend(uuid_as_bytes[0:4])
         return data
 
     def to_dict(self):
@@ -746,7 +751,8 @@ class SaveAsDefaultConfigurationPayload(CommonPayload):
 
     @classmethod
     def from_bytes(cls, data):
-        uuid = int.from_bytes(data[1:13], byteorder='little')
+        #uuid = int.from_bytes(data[1:13], byteorder='little')
+        uuid = int.from_bytes(data[9:13] + data[5:9] + data[1:5], byteorder='little')       # Reorder uint32 blocks, to match earlier formatting of UUID
         return SaveAsDefaultConfigurationPayload(uuid)
 
     def __len__(self):
@@ -754,11 +760,14 @@ class SaveAsDefaultConfigurationPayload(CommonPayload):
 
     def __str__(self):
         class_prefix = super().__str__() + " "
-        return class_prefix + f"uuid: {self.uuid}"
+        return class_prefix + f"uuid: {self.uuid:024x}"
 
     def to_bytes(self):
+        uuid_as_bytes = self.uuid.to_bytes(12, byteorder='little')
         data = array.array('B', [CommonPayloadId.SAVE_AS_DEFAULT])
-        data.extend(self.uuid.to_bytes(12, byteorder='little'))
+        data.extend(uuid_as_bytes[8:12])                                                    # Reorder uint32 blocks, to match earlier formatting of UUID
+        data.extend(uuid_as_bytes[4:8])
+        data.extend(uuid_as_bytes[0:4])
         return data
 
     def to_dict(self):
@@ -766,7 +775,6 @@ class SaveAsDefaultConfigurationPayload(CommonPayload):
             'payload_id': CommonPayloadId.SAVE_AS_DEFAULT,
             'uuid': self.uuid
         }
-
 
 class FirmwareStartPayload(CommonPayload):
     SIZE = 2
