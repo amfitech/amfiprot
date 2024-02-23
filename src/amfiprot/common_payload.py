@@ -739,22 +739,32 @@ class LoadDefaultConfigurationPayload(CommonPayload):
         }
 
 class SaveAsDefaultConfigurationPayload(CommonPayload):
-    def __init__(self):
-        self.data = array.array('B', [CommonPayloadId.SAVE_AS_DEFAULT])
+    SIZE = 13
+
+    def __init__(self, uuid):
+        self.uuid = uuid
 
     @classmethod
     def from_bytes(cls, data):
-        return SaveAsDefaultConfigurationPayload()
+        uuid = int.from_bytes(data[1:13], byteorder='little')
+        return SaveAsDefaultConfigurationPayload(uuid)
 
     def __len__(self):
-        return len(self.data)
+        return self.SIZE
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"uuid: {self.uuid}"
 
     def to_bytes(self):
-        return self.data
+        data = array.array('B', CommonPayloadId.SAVE_AS_DEFAULT)
+        data.extend(self.uuid.to_bytes(12, byteorder='little'))
+        return data
 
     def to_dict(self):
         return {
-            'payload_id': CommonPayloadId.SAVE_AS_DEFAULT
+            'payload_id': CommonPayloadId.SAVE_AS_DEFAULT,
+            'uuid': self.uuid
         }
 
 
