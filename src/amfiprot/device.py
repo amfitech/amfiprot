@@ -5,6 +5,7 @@ import os
 from .packet import Packet, PacketType
 from .common_payload import *
 from .configurator import Configurator
+from .payload import *
 
 if TYPE_CHECKING:
     from .node import Node
