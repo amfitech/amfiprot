@@ -56,7 +56,7 @@ class Device:
 
         # Send firmware start command
         self.node.send_payload(FirmwareStartPayload())
-        self._await_reply(PayloadType.SUCCESS, timeout_ms=10_000)
+        self._await_reply(PayloadType.SUCCESS, timeout_ms=20_000)
 
         # Send data packets and receive Ack for each packet
         progress_timer = MilliTimer(1000, autostart=True)
