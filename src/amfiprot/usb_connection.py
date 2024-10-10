@@ -2,7 +2,9 @@ import array
 import sys
 import usb.core
 import usb.util
-import multiprocessing as mp
+import usb.backend.libusb1
+import libusb_package
+import multiprocessing as mp    # For reading and writing from/to USB devices
 import time
 import hashlib
 import enum
@@ -33,7 +35,8 @@ class USBConnection(Connection):
 
         self.receive_process: mp.Process = None
         self.transmit_process: mp.Process = None
-        self.usb_task: mp.Process = None
+        self.usb_task_read: mp.Process = None
+        self.usb_task_write: mp.Process = None
         self.nodes: List[Node] = []
         self.transmit_queue: mp.Queue = mp.Queue()
         self.global_receive_queue: mp.Queue = mp.Queue()
@@ -48,7 +51,8 @@ class USBConnection(Connection):
 
     @classmethod
     def discover(cls):
-        devices = usb.core.find(find_all=True)
+        backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
+        devices = usb.core.find(find_all=True, backend=backend)
         device_list = []
 
         for device in devices:
@@ -67,7 +71,7 @@ class USBConnection(Connection):
                 continue
 
         return device_list
-
+    
     def find_nodes(self) -> List[Node]:
         # TODO: Clean this method. Implement helper functions for blocking send/receive
 
@@ -173,22 +177,36 @@ class USBConnection(Connection):
 
         atexit.register(connection_exit_handler, self)
 
-        # Create rx process
+        # Create read and write processes
         tx_ids = [node.tx_id for node in self.nodes]
         rx_queues = [node.receive_queue for node in self.nodes]
 
-        self.usb_task = mp.Process(target=usb_task, args=(usb_device_hash, tx_ids, rx_queues, self.transmit_queue, self.global_receive_queue, self.node_update_queue))
-        self.usb_task.start()
-        time.sleep(1)  # To allow processes to start up
+        out_conn_write, in_conn_write = mp.Pipe()   # Used by sub task to signal to main that it is ready 
+        out_conn_read, in_conn_read = mp.Pipe()     # Used by sub task to signal to main that it is ready 
+
+        self.usb_task_write = mp.Process(target=usb_task_write, args=(out_conn_write, usb_device_hash, self.transmit_queue))
+        self.usb_task_read = mp.Process(target=usb_task_read, args=(out_conn_read, usb_device_hash, tx_ids, rx_queues, self.global_receive_queue, self.node_update_queue))
+
+        self.usb_task_write.start()
+        self.usb_task_read.start()
+
+        in_conn_read.recv()  # Will block until something is received from usb_task_read
+        in_conn_write.recv()  # Will block until something is received from usb_task_write
 
     def stop(self):
         # TODO: Send stop request to task and wait for acknowledge (allows outbound packets to be sent before stopping)
 
-        if self.usb_task is not None:
-            if self.usb_task.is_alive():
+        if self.usb_task_read is not None:
+            if self.usb_task_read.is_alive():
                 time.sleep(1)  # To allow pending tx packets to be sent
-                self.usb_task.terminate()
-                self.usb_task.join()
+                self.usb_task_read.terminate()
+                self.usb_task_read.join()
+
+        if self.usb_task_write is not None:
+            if self.usb_task_write.is_alive():
+                time.sleep(1)  # To allow pending tx packets to be sent
+                self.usb_task_write.terminate()
+                self.usb_task_write.join()
 
     def refresh(self):
         #rx_queues = [node.receive_queue for node in self.nodes]  # Cannot send queues in a queue to other process
@@ -219,8 +237,7 @@ class ConnectionState(enum.IntEnum):
     CONNECTED = 1
     DISCONNECTED = 2
 
-
-def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Queue, global_receive_queue: mp.Queue, node_update_queue: mp.Queue):
+def usb_task_read(conn, usb_device_hash, tx_ids, rx_queues: List[mp.Queue], global_receive_queue: mp.Queue, node_update_queue: mp.Queue):
     IN_ENDPOINT = 0x81
     OUT_ENDPOINT = 0x01
     RETRY_LIMIT = 10
@@ -239,21 +256,10 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
     tx_ids_local = tx_ids
     rx_queues_local = rx_queues
 
+    conn.send(0)    # Notify main process that usb_task_read is started
+
     while True:
         if state == ConnectionState.CONNECTED:
-
-            # Send all pending packets
-            while not tx_queue.empty():
-                tx_packet = tx_queue.get_nowait()
-
-                byte_data = array.array('B', [1])
-                byte_data.extend(tx_packet.to_bytes())
-                byte_data.extend([0] * (64 - len(byte_data)))
-                try:
-                    bytes_written = dev.write(OUT_ENDPOINT, byte_data, timeout=1000) # TODO: Do something about this timeout! It was 1 ms before in order not to block reading, but sometimes it is not enough time to actually send the packet.
-                except usb.core.USBError as e:  # TODO: Check disconnect in some other way before getting from tx_queue, because this drops packets!
-                    print(f"Could not send packet ({e})")
-                    continue
 
             # Check for tx_id change before receiving
             if not node_update_queue.empty():
@@ -310,6 +316,54 @@ def usb_task(usb_device_hash, tx_ids, rx_queues: List[mp.Queue], tx_queue: mp.Qu
             raise ValueError("Invalid state in USB task.")
 
 
+def usb_task_write(conn, usb_device_hash, tx_queue: mp.Queue):
+    IN_ENDPOINT = 0x81
+    OUT_ENDPOINT = 0x01
+    RETRY_LIMIT = 10
+
+    retry_count = 0
+    dev = None
+
+    while dev is None:
+        dev = get_usb_device_by_hash(usb_device_hash)
+        state = ConnectionState.CONNECTED
+
+        retry_count = retry_count + 1
+        if retry_count > RETRY_LIMIT and dev is None:
+            raise ConnectionError("Subprocess could not find device.")
+
+    conn.send(0)    # Notify main process that usb_task_write is started
+
+    while True:
+        if state == ConnectionState.CONNECTED:
+
+            # Send all pending packets
+            if not tx_queue.empty():
+                tx_packet = tx_queue.get_nowait()
+
+                byte_data = array.array('B', [1])
+                byte_data.extend(tx_packet.to_bytes())
+                byte_data.extend([0] * (64 - len(byte_data)))
+                try:
+                    bytes_written = dev.write(OUT_ENDPOINT, byte_data, timeout=1000)
+                except usb.core.USBError as e:  # TODO: Check disconnect in some other way before getting from tx_queue, because this drops packets!
+                    print(f"Could not send packet ({e})")
+                    continue
+
+        elif state == ConnectionState.DISCONNECTED:
+            print("Reconnecting...")
+
+            dev = get_usb_device_by_hash(usb_device_hash)
+
+            if dev is not None:
+                print("Connection re-established!")
+                state = ConnectionState.CONNECTED
+            else:
+                time.sleep(1)
+        else:
+            raise ValueError("Invalid state in USB task.")
+
+
 def connect_usb(vendor_id, product_id, serial_number=None):
     for i in range(3):
         try:
@@ -340,7 +394,8 @@ def connect_usb(vendor_id, product_id, serial_number=None):
 
 
 def get_usb_devices(vendor_id, product_id):
-    return list(usb.core.find(find_all=True, idVendor=vendor_id, idProduct=product_id))
+    backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
+    return list(usb.core.find(find_all=True, idVendor=vendor_id, idProduct=product_id, backend=backend))
 
 
 def get_serial_number(device: usb.core.Device) -> int:
@@ -349,7 +404,8 @@ def get_serial_number(device: usb.core.Device) -> int:
 
 def get_matching_device(vendor_id, product_id, serial_number) -> usb.core.Device:
     if serial_number is None:
-        device: usb.core.Device = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+        backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
+        device: usb.core.Device = usb.core.find(idVendor=vendor_id, idProduct=product_id, backend=backend)
 
         if device is None:
             raise ConnectionError("No match!")
@@ -362,8 +418,9 @@ def get_matching_device(vendor_id, product_id, serial_number) -> usb.core.Device
         # device.set_configuration()
         return device
     else:
-        devices = usb.core.find(find_all=True, idVendor=vendor_id, idProduct=product_id)
-
+        backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
+        devices = usb.core.find(find_all=True, idVendor=vendor_id, idProduct=product_id, backend=backend)
+        
         for device in devices:
             if get_serial_number(device) == serial_number:
                 return device

@@ -3,52 +3,10 @@ Amfiprot is a communication protocol for embedded devices used and developed by 
 # Prerequisites
 
 - Python 3.6 or higher.
-- [libusb](https://libusb.info/) in order to communicate with USB devices through `pyusb`
 
 # Installation
 
-## Windows
-
-Get a libusb Windows binary from https://libusb.info/. From the downloaded archive, copy the following two files:
-
-- `VS2015-x64\dll\libusb-1.0.dll` to `C:\Windows\System32`
-- `VS2015-Win32\dll\libusb-1.0.dll` to `C:\Windows\SysWOW64`
-
 Install (or update) `amfiprot` with `pip`:
-
-```shell
-pip install -U amfiprot
-```
-
-## Linux (Ubuntu)
-
-Install `libusb`:
-
-```shell
-sudo apt install libusb-1.0-0-dev
-```
-
-Make sure that your user has access to USB devices. For example, give the `plugdev` group access to USB devices by creating a udev rule:
-
-```shell
-echo 'SUBSYSTEM=="usb", MODE="660", GROUP="plugdev"' | sudo tee /etc/udev/rules.d/50-pyusb.rules
-sudo udevadm control --reload
-sudo udevadm trigger
-```
-
-Check whether you are a member of `plugdev` with:
-
-```shell
-groups <username>
-```
-
-If not, add yourself to the group with:
-
-``` shell
-sudo usermod -aG plugdev <username>
-```
-
-Finally, install (or update) `amfiprot` with `pip`:
 
 ```shell
 pip install -U amfiprot
