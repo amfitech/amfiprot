@@ -55,6 +55,7 @@ class UndefinedPayload(Payload):
     def __str__(self):
         return str(self.data)
 
+    @property
     def type(self):
         return self.payload_type
 

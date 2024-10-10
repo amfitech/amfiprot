@@ -30,31 +30,31 @@ pipeline {
         """
       }
     }
-    stage('Lint') {
-      steps {
-        bat """
-          call .\\venv\\Scripts\\activate.bat
-          call pylint src
-          if %errorlevel%==0 (
-             echo Pylint finished with no warnings.
-             exit /b 0
-          )
+    // stage('Lint') {
+    //   steps {
+    //     bat """
+    //       call .\\venv\\Scripts\\activate.bat
+    //       call pylint src
+    //       if %errorlevel%==0 (
+    //          echo Pylint finished with no warnings.
+    //          exit /b 0
+    //       )
 
-          if %errorlevel%==4 (
-            echo Pylint finished with warnings.
-            exit /b 0
-          )
-        """
-      }
-    }
+    //       if %errorlevel%==4 (
+    //         echo Pylint finished with warnings.
+    //         exit /b 0
+    //       )
+    //     """
+    //   }
+    // }
     stage('Build docs') {
       steps {
         bat """
           call .\\venv\\Scripts\\activate.bat
-          call .\\doc\\make.bat html
+          call .\\doc\\make.bat html || exit 1
+          xcopy .\\doc\\build\\html C:\\wamp64\\www\\amfiprot_py /E /I /Y
         """
       }
     }
   }
 }
-

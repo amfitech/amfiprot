@@ -1,9 +1,8 @@
-from .payload import Payload, PayloadType
+from .payload import Payload
 import array
 import enum
 import struct
 from abc import abstractmethod
-from typing import Type
 
 
 class CommonPayloadId(enum.IntEnum):  # When PayloadType is Common, these PayloadID's are available
@@ -39,6 +38,11 @@ class CommonPayloadId(enum.IntEnum):  # When PayloadType is Common, these Payloa
     REPLY_FIRMWARE_VERSION_PER_ID = 0x1D
     DEBUG_OUTPUT = 0x20
     REBOOT = 0x21
+    RESET_PARAMETER = 0x24
+    REQUEST_PROCEDURE_SPEC = 0x30
+    REPLY_PROCEDURE_SPEC = 0x31
+    REQUEST_PROCEDURE_CALL = 0x32
+    REPLY_PROCEDURE_CALL = 0x33
 
 
 class ConfigValueType(enum.IntEnum):
@@ -114,7 +118,7 @@ class ReplyDeviceIdPayload(CommonPayload):
     @classmethod
     def from_bytes(cls, data):
         tx_id = data[1]
-        uuid = int.from_bytes(data[2:14], byteorder='little')
+        uuid = int.from_bytes(data[10:14] + data[6:10] + data[2:6], byteorder='little')     # Reorder uint32 blocks, to match earlier formatting of UUID
         return ReplyDeviceIdPayload(tx_id, uuid)
 
     def __len__(self):
@@ -125,8 +129,11 @@ class ReplyDeviceIdPayload(CommonPayload):
         return class_prefix + f"tx_id: {self.tx_id}, uuid: {self.uuid:024x}"
 
     def to_bytes(self):
+        uuid_as_bytes = self.uuid.to_bytes(12, byteorder='little')
         data = array.array('B', [CommonPayloadId.REPLY_DEVICE_ID, self.tx_id])
-        data.extend(self.uuid.to_bytes(12, byteorder='little'))
+        data.extend(uuid_as_bytes[8:12])                                                     # Reorder uint32 blocks, to match earlier formatting of UUID
+        data.extend(uuid_as_bytes[4:8])
+        data.extend(uuid_as_bytes[0:4])
         return data
 
     def to_dict(self):
@@ -147,7 +154,7 @@ class SetTxIdPayload(CommonPayload):
     @classmethod
     def from_bytes(cls, data):
         tx_id = data[1]
-        uuid = int.from_bytes(data[2:14], byteorder='little')
+        uuid = int.from_bytes(data[10:14] + data[6:10] + data[2:6], byteorder='little')     # Reorder uint32 blocks, to match earlier formatting of UUID
         return SetTxIdPayload(tx_id, uuid)
 
     def __len__(self):
@@ -155,11 +162,14 @@ class SetTxIdPayload(CommonPayload):
 
     def __str__(self):
         class_prefix = super().__str__() + " "
-        return class_prefix + f"tx_id: {self.tx_id}, uuid: {self.uuid}"
+        return class_prefix + f"tx_id: {self.tx_id}, uuid: {self.uuid:024x}"
 
     def to_bytes(self):
+        uuid_as_bytes = self.uuid.to_bytes(12, byteorder='little')
         data = array.array('B', [CommonPayloadId.SET_TX_ID, self.tx_id])
-        data.extend(self.uuid.to_bytes(12, byteorder='little'))
+        data.extend(uuid_as_bytes[8:12])                                                     # Reorder uint32 blocks, to match earlier formatting of UUID
+        data.extend(uuid_as_bytes[4:8])
+        data.extend(uuid_as_bytes[0:4])
         return data
 
     def to_dict(self):
@@ -284,6 +294,36 @@ class ReplyFirmwareVersionPerIdPayload(CommonPayload):
             'fw_version': self.fw_version,
             'processor_id': self.processor_id
         }
+    
+
+class DebugOutputPayload(CommonPayload):
+    def __init__(self, debug_message: str):
+        self.debug_message = debug_message
+
+    @classmethod
+    def from_bytes(cls, data):
+        debug_message = byte_array_to_string(data[1:])
+        return DebugOutputPayload(debug_message)
+
+    def __len__(self):
+        return len(self.debug_message) + 2
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"debug_message: {self.debug_message}"
+
+    def to_bytes(self):
+        arr = array.array('B', [CommonPayloadId.DEBUG_OUTPUT])
+        arr.extend(self.debug_message.encode('ascii'))
+        arr.append(0)
+        return arr
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.DEBUG_OUTPUT,
+            'debug_message': self.debug_message
+        }
+
 
 class RequestDeviceNamePayload(CommonPayload):
     def __init__(self):
@@ -353,6 +393,26 @@ class RebootPayload(CommonPayload):
             'payload_id': self.data[0]
         }
 
+class ResetParameterPayload(CommonPayload):
+    def __init__(self, ResetParameter: int = 0):
+        self.data = array.array('B', [CommonPayloadId.RESET_PARAMETER, ResetParameter])
+
+    @classmethod
+    def from_bytes(cls, data):
+        ResetParameter = data[1]
+        return RequestFirmwareVersionPerIdPayload(ResetParameter)
+
+    def __len__(self):
+        return len(self.data)
+
+    def to_bytes(self):
+        return self.data
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.RESET_PARAMETER,
+            'resetParameter_id': self.data[1]
+        }
 
 class RequestCategoryCountPayload(CommonPayload):
     def __init__(self):
@@ -684,24 +744,37 @@ class LoadDefaultConfigurationPayload(CommonPayload):
         }
 
 class SaveAsDefaultConfigurationPayload(CommonPayload):
-    def __init__(self):
-        self.data = array.array('B', CommonPayloadId.SAVE_AS_DEFAULT)
+    SIZE = 13
+
+    def __init__(self, uuid):
+        self.uuid = uuid
 
     @classmethod
     def from_bytes(cls, data):
-        return SaveAsDefaultConfigurationPayload()
+        #uuid = int.from_bytes(data[1:13], byteorder='little')
+        uuid = int.from_bytes(data[9:13] + data[5:9] + data[1:5], byteorder='little')       # Reorder uint32 blocks, to match earlier formatting of UUID
+        return SaveAsDefaultConfigurationPayload(uuid)
 
     def __len__(self):
-        return len(self.data)
+        return self.SIZE
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"uuid: {self.uuid:024x}"
 
     def to_bytes(self):
-        return self.data
+        uuid_as_bytes = self.uuid.to_bytes(12, byteorder='little')
+        data = array.array('B', [CommonPayloadId.SAVE_AS_DEFAULT])
+        data.extend(uuid_as_bytes[8:12])                                                    # Reorder uint32 blocks, to match earlier formatting of UUID
+        data.extend(uuid_as_bytes[4:8])
+        data.extend(uuid_as_bytes[0:4])
+        return data
 
     def to_dict(self):
         return {
-            'payload_id': CommonPayloadId.SAVE_AS_DEFAULT
+            'payload_id': CommonPayloadId.SAVE_AS_DEFAULT,
+            'uuid': self.uuid
         }
-
 
 class FirmwareStartPayload(CommonPayload):
     SIZE = 2
@@ -817,7 +890,226 @@ class SetConfigurationValueUidPayload(CommonPayload):
             'config_uid': self.config_uid,
             'config_value': self.config_value
         }
+    
+class RequestProcedureSpec(CommonPayload):
+    def __init__(self, index, uid=None):
+        self.RPC_Index = index
+        self.RPC_UID = uid
 
+    @classmethod
+    def from_bytes(cls, data):
+        RPC_Index = int.from_bytes(data[1:3], byteorder='little')
+        RPC_UID = int.from_bytes(data[3:7], byteorder='little')
+        return RequestProcedureSpec(RPC_Index, RPC_UID)
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"RPC_Index: {self.RPC_Index}, RPC_UID: {self.RPC_UID}"
+
+    def __len__(self):
+        return len(self.to_bytes())  # FIXME: hack
+
+    def to_bytes(self):
+        data = array.array('B', [CommonPayloadId.REQUEST_PROCEDURE_SPEC])
+        data.extend(int.to_bytes(self.RPC_Index, length=2, byteorder='little'))
+        data.extend(int.to_bytes(self.RPC_UID, length=4, byteorder='little'))
+        return data
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.REQUEST_PROCEDURE_SPEC,
+            'RPC_Index': self.RPC_Index,
+            'RPC_UID': self.RPC_UID
+        }
+    
+class ReplyProcedureSpec(CommonPayload):
+    def __init__(self, index=None, uid=None, returnValueType=None, Param1Type=None, Param2Type=None, Param3Type=None, Param4Type=None, Param5Type=None, Name=None):
+        self.RPC_Index = index
+        self.RPC_UID = uid
+        self.RPC_ReturnValueType = returnValueType
+        self.RPC_Param1Type = Param1Type
+        self.RPC_Param2Type = Param2Type
+        self.RPC_Param3Type = Param3Type
+        self.RPC_Param4Type = Param4Type
+        self.RPC_Param5Type = Param5Type
+        self.RPC_Name = Name
+
+    @classmethod
+    def from_bytes(cls, data):
+        RPC_Index = int.from_bytes(data[1:3], byteorder='little')
+        RPC_UID = int.from_bytes(data[3:7], byteorder='little')
+        RPC_ReturnValueType = data[7]
+        RPC_Param1Type = data[8]
+        RPC_Param2Type = data[9]
+        RPC_Param3Type = data[10]
+        RPC_Param4Type = data[11]
+        RPC_Param5Type = data[12]
+        string_bytes = data[13:].tobytes()
+        RPC_Name = string_bytes.decode('utf-8')
+        return ReplyProcedureSpec(RPC_Index, RPC_UID, RPC_ReturnValueType, RPC_Param1Type, RPC_Param2Type, RPC_Param3Type, RPC_Param4Type, RPC_Param5Type, RPC_Name)
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"RPC_Index: {self.RPC_Index}, RPC_UID: {self.RPC_UID}, RPC_ReturnValueType: {self.RPC_ReturnValueType}, RPC_Param1Type: {self.RPC_Param1Type}, RPC_Param2Type: {self.RPC_Param2Type}, RPC_Param3Type: {self.RPC_Param3Type}, RPC_Param4Type: {self.RPC_Param4Type}, RPC_Param5Type: {self.RPC_Param5Type}, RPC_Name: {self.RPC_Name}"
+
+    def __len__(self):
+        return len(self.to_bytes())  # FIXME: hack
+
+    def to_bytes(self):
+        data = array.array('B', [CommonPayloadId.REPLY_PROCEDURE_SPEC])
+        data.extend(int.to_bytes(self.RPC_Index, length=2, byteorder='little'))
+        data.extend(int.to_bytes(self.RPC_UID, length=4, byteorder='little'))
+        data.append(self.RPC_ReturnValueType)
+        data.append(self.RPC_Param1Type)
+        data.append(self.RPC_Param2Type)
+        data.append(self.RPC_Param3Type)
+        data.append(self.RPC_Param4Type)
+        data.append(self.RPC_Param5Type)
+        data.extend(self.RPC_Name)
+        return data
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.REPLY_PROCEDURE_SPEC,
+            'RPC_Index': self.RPC_Index,
+            'RPC_UID': self.RPC_UID,
+            'RPC_ReturnValueType': self.RPC_ReturnValueType,
+            'RPC_Param1Type': self.RPC_Param1Type,
+            'RPC_Param2Type': self.RPC_Param2Type,
+            'RPC_Param3Type': self.RPC_Param3Type,
+            'RPC_Param4Type': self.RPC_Param4Type,
+            'RPC_Param5Type': self.RPC_Param5Type,
+            'RPC_Name': self.RPC_Name,
+        }
+    
+class RequestProcedureCall(CommonPayload):
+    def __init__(self, uid, Param1Type: ConfigValueType, Param1Value: int, Param2Type: int=None, Param2Value: int=None, Param3Type: int=None, Param3Value: int=None, Param4Type: int=None, Param4Value: int=None, Param5Type: int=None, Param5Value: int=None):
+        self.RPC_UID = uid
+        self.RPC_Param1Type = Param1Type
+        self.RPC_Param1Value = Param1Value
+        if Param2Type is None: 
+            self.RPC_Param2Type = 0
+        else:
+            self.RPC_Param2Type = Param2Type
+        if Param2Value is None:
+            self.RPC_Param2Value = 0
+        else:
+            self.RPC_Param2Value = Param2Value
+
+        if Param3Type is None: 
+            self.RPC_Param3Type = 0
+        else:
+            self.RPC_Param3Type = Param3Type
+        if Param3Value is None:
+            self.RPC_Param3Value = 0
+        else:
+            self.RPC_Param3Value = Param3Value
+
+        if Param4Type is None: 
+            self.RPC_Param4Type = 0
+        else:
+            self.RPC_Param4Type = Param4Type
+        if Param4Value is None:
+            self.RPC_Param4Value = 0
+        else:
+            self.RPC_Param4Value = Param4Value
+
+        if Param5Type is None: 
+            self.RPC_Param5Type = 0
+        else:
+            self.RPC_Param5Type = Param5Type
+        if Param5Value is None:
+            self.RPC_Param5Value = 0
+        else:
+            self.RPC_Param5Value = Param5Value
+
+    @classmethod
+    def from_bytes(cls, data):
+        RPC_UID = int.from_bytes(data[1:5], byteorder='little')
+        RPC_Param1Type = data[5]
+        RPC_Param1Value = decode_config_value(RPC_Param1Type, data[6:14])
+        RPC_Param2Type = data[14]
+        RPC_Param2Value = decode_config_value(RPC_Param2Type, data[15:23])
+        RPC_Param3Type = data[23]
+        RPC_Param3Value = decode_config_value(RPC_Param3Type, data[24:32])
+        RPC_Param4Type = data[32]
+        RPC_Param4Value = decode_config_value(RPC_Param4Type, data[33:41])
+        RPC_Param5Type = data[41]
+        RPC_Param5Value = decode_config_value(RPC_Param5Type, data[42:50])
+        return RequestProcedureCall(RPC_UID, RPC_Param1Type, RPC_Param1Value, RPC_Param2Type, RPC_Param2Value, RPC_Param3Type, RPC_Param3Value, RPC_Param4Type, RPC_Param4Value, RPC_Param5Type, RPC_Param5Value)
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"RPC_UID: {self.RPC_UID}, RPC_Param1Type: {self.RPC_Param1Type}, RPC_Param1Value: {self.RPC_Param1Value}, RPC_Param2Type: {self.RPC_Param2Type}, RPC_Param2Value: {self.RPC_Param2Value}, RPC_Param3Type: {self.RPC_Param3Type}, RPC_Param3Value: {self.RPC_Param3Value}, RPC_Param4Type: {self.RPC_Param4Type}, RPC_Param4Value: {self.RPC_Param4Value}, RPC_Param5Type: {self.RPC_Param5Type}, RPC_Param5Value: {self.RPC_Param5Value}"
+
+    def __len__(self):
+        return len(self.to_bytes())  # FIXME: hack
+
+    def to_bytes(self):
+        data = array.array('B', [CommonPayloadId.REQUEST_PROCEDURE_CALL])
+        data.extend(int.to_bytes(self.RPC_UID, length=4, byteorder='little'))
+        data.append(self.RPC_Param1Type)
+        data.extend(int.to_bytes(self.RPC_Param1Value, length=8, byteorder='little'))
+        data.append(self.RPC_Param2Type)
+        data.extend(int.to_bytes(self.RPC_Param2Value, length=8, byteorder='little'))
+        data.append(self.RPC_Param3Type)
+        data.extend(int.to_bytes(self.RPC_Param3Value, length=8, byteorder='little'))
+        data.append(self.RPC_Param4Type)
+        data.extend(int.to_bytes(self.RPC_Param4Value, length=8, byteorder='little'))
+        data.append(self.RPC_Param5Type)
+        data.extend(int.to_bytes(self.RPC_Param5Value, length=8, byteorder='little'))
+        return data
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.REQUEST_PROCEDURE_CALL,
+            'RPC_UID': self.RPC_UID,
+            'RPC_Param1Type': self.RPC_Param1Type,
+            'RPC_Param1Value': self.RPC_Param1Value,
+            'RPC_Param2Type': self.RPC_Param2Type,
+            'RPC_Param2Value': self.RPC_Param2Value,
+            'RPC_Param3Type': self.RPC_Param3Type,
+            'RPC_Param3Value': self.RPC_Param3Value,
+            'RPC_Param4Type': self.RPC_Param4Type,
+            'RPC_Param4Value': self.RPC_Param4Value,
+            'RPC_Param5Type': self.RPC_Param5Type,
+            'RPC_Param5Value': self.RPC_Param5Value,
+        }
+
+class ReplyProcedureCall(CommonPayload):
+    def __init__(self, uid=None, ReturnType: ConfigValueType=None, ReturnValue: int=None):
+        self.RPC_UID = uid
+        self.RPC_ReturnType = ReturnType
+        self.RPC_ReturnValue = ReturnValue
+
+    @classmethod
+    def from_bytes(cls, data):
+        RPC_UID = int.from_bytes(data[1:5], byteorder='little')
+        RPC_ReturnType = data[5]
+        RPC_ReturnValue = decode_config_value(RPC_ReturnType, data[6:14])
+        return ReplyProcedureCall(RPC_UID, RPC_ReturnType, RPC_ReturnValue)
+
+    def __str__(self):
+        class_prefix = super().__str__() + " "
+        return class_prefix + f"RPC_UID: {self.RPC_UID}, RPC_ReturnType: {self.RPC_ReturnType}, RPC_ReturnValue: {self.RPC_ReturnValue}"
+
+    def __len__(self):
+        return len(self.to_bytes())  # FIXME: hack
+
+    def to_bytes(self):
+        data = array.array('B', [CommonPayloadId.REPLY_PROCEDURE_CALL])
+        data.extend(int.to_bytes(self.RPC_UID, length=4, byteorder='little'))
+        data.append(self.RPC_ReturnType)
+        data.extend(int.to_bytes(self.RPC_ReturnValue, length=8, byteorder='little'))
+        return data
+
+    def to_dict(self):
+        return {
+            'payload_id': CommonPayloadId.REPLY_PROCEDURE_CALL,
+            'RPC_UID': self.RPC_UID,
+            'RPC_ReturnType': self.RPC_ReturnType,
+            'RPC_ReturnValue': self.RPC_ReturnValue,
+        }
 
 def byte_array_to_string(byte_array: array.array):
     return bytes(byte_array).decode('ascii').rstrip('\x00')
@@ -898,7 +1190,13 @@ payload_ids = {
             CommonPayloadId.FIRMWARE_DATA:FirmwareDataPayload,
             CommonPayloadId.FIRMWARE_END: FirmwareEndPayload,
             CommonPayloadId.REQUEST_FIRMWARE_VERSION_PER_ID: RequestFirmwareVersionPerIdPayload,
-            CommonPayloadId.REPLY_FIRMWARE_VERSION_PER_ID: ReplyFirmwareVersionPerIdPayload
+            CommonPayloadId.REPLY_FIRMWARE_VERSION_PER_ID: ReplyFirmwareVersionPerIdPayload,
+            CommonPayloadId.DEBUG_OUTPUT: DebugOutputPayload,
+            CommonPayloadId.RESET_PARAMETER: ResetParameterPayload,
+            CommonPayloadId.REQUEST_PROCEDURE_SPEC: RequestProcedureSpec,
+            CommonPayloadId.REPLY_PROCEDURE_SPEC: ReplyProcedureSpec,
+            CommonPayloadId.REQUEST_PROCEDURE_CALL: RequestProcedureCall,
+            CommonPayloadId.REPLY_PROCEDURE_CALL: ReplyProcedureCall,
         }
 
 

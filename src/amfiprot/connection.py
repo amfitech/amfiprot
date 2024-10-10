@@ -5,6 +5,8 @@ from .node import Node
 
 
 class Connection(ABC):
+    """Interface for connecting to a root node."""
+
     @abstractmethod
     def find_nodes(self) -> List[Node]:
         """ Searches for Amfiprot-compatible nodes on the Connection and returns a list of Node objects. """
@@ -21,6 +23,7 @@ class Connection(ABC):
         """ Stops the subprocesses that were created when invoking start(). """
         pass
 
+    @abstractmethod
     def refresh(self):
         """ Inform the connection that e.g. a previously registered node has changed """
         pass

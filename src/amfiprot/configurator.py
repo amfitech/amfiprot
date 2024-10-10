@@ -7,7 +7,7 @@ class Configurator:
     def __init__(self, device):
         self.device = device
 
-    def read_all(self) -> List[dict]:
+    def read_all(self, flat_list: bool = False) -> List[dict]:
         config = []
 
         for cat_index in range(self._get_category_count()):
@@ -20,17 +20,36 @@ class Configurator:
 
                 category['parameters'].append({'uid': uid, 'name': name, 'value': value})
 
-            config.append(category)
+            if flat_list:
+                for param in category['parameters']:
+                    param['category'] = category_name
+                    config.append(param)
+            else:
+                config.append(category)
         return config
 
     def write_all(self, config):
+        # Detect if config is a flat list or categories with nested parameters
+        flat_list = False
+
+        if 'uid' in config[0].keys():
+            print("Flat list detected!")
+            flat_list = True
+
         # Write all parameters
-        for category in config:
-            for parameter in category['parameters']:
+        if flat_list:
+            for parameter in config:
                 try:
                     self.write(parameter['uid'], parameter['value'])
                 except ValueError:
                     warnings.warn(f"Parameter \"{parameter['name']}\" ({parameter['uid']}) does not exist on device")
+        else:
+            for category in config:
+                for parameter in category['parameters']:
+                    try:
+                        self.write(parameter['uid'], parameter['value'])
+                    except ValueError:
+                        warnings.warn(f"Parameter \"{parameter['name']}\" ({parameter['uid']}) does not exist on device")
 
     def read(self, uid, return_datatype: bool = False) -> Union[int, float, bool, str]:
         self.device.node.send_payload(RequestConfigurationValueUidPayload(uid))

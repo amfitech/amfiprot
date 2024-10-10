@@ -5,6 +5,7 @@ import os
 from .packet import Packet, PacketType
 from .common_payload import *
 from .configurator import Configurator
+from .payload import *
 
 if TYPE_CHECKING:
     from .node import Node
@@ -55,7 +56,7 @@ class Device:
 
         # Send firmware start command
         self.node.send_payload(FirmwareStartPayload())
-        self._await_reply(PayloadType.SUCCESS, timeout_ms=10_000)
+        self._await_reply(PayloadType.SUCCESS, timeout_ms=20_000)
 
         # Send data packets and receive Ack for each packet
         progress_timer = MilliTimer(1000, autostart=True)
@@ -87,6 +88,18 @@ class Device:
 
     def reboot(self):
         self.node.send_payload(RebootPayload())
+
+    def getProcedureSpec(self, index, uid=None) -> ReplyProcedureCall:
+        payload = RequestProcedureSpec(index, uid)
+        self.node.send_payload(payload)
+        packet = self._await_packet(ReplyProcedureSpec, timeout_ms=1000)
+        return packet
+
+    def callProcedure(self, uid, Param1Type: ConfigValueType, Param1Value: int, Param2Type=None, Param2Value=None, Param3Type=None, Param3Value=None, Param4Type=None, Param4Value=None, Param5Type=None, Param5Value=None):
+        payload = RequestProcedureCall(uid, Param1Type, Param1Value, Param2Type, Param2Value, Param3Type, Param3Value, Param4Type, Param4Value, Param5Type, Param5Value)
+        self.node.send_payload(payload)
+        packet = self._await_packet(ReplyProcedureCall, timeout_ms=1000)
+        return packet
 
     def packet_available(self) -> bool:
         return self.node.packet_available()

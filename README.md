@@ -3,49 +3,10 @@ Amfiprot is a communication protocol for embedded devices used and developed by 
 # Prerequisites
 
 - Python 3.6 or higher.
-- [libusb](https://libusb.info/) in order to communicate with USB devices through `pyusb`
 
 # Installation
 
-## Windows
-
-Get a libusb Windows binary from https://libusb.info/.
-
 Install (or update) `amfiprot` with `pip`:
-
-```shell
-pip install -U amfiprot
-```
-
-## Linux (Ubuntu)
-
-Install `libusb`:
-
-```shell
-sudo apt install libusb-1.0-0-dev
-```
-
-Make sure that your user has access to USB devices. For example, give the `plugdev` group access to USB devices by creating a udev rule:
-
-```shell
-echo 'SUBSYSTEM=="usb", MODE="660", GROUP="plugdev"' | sudo tee /etc/udev/rules.d/50-pyusb.rules
-sudo udevadm control --reload
-sudo udevadm trigger
-```
-
-Check whether you are a member of `plugdev` with:
-
-```shell
-groups <username>
-```
-
-If not, add yourself to the group with:
-
-``` shell
-sudo usermod -aG plugdev <username>
-```
-
-Finally, install (or update) `amfiprot` with `pip`:
 
 ```shell
 pip install -U amfiprot
@@ -70,12 +31,12 @@ VENDOR_ID = 0xC17
 PRODUCT_ID = 0xD12
 
 if __name__ == "__main__":
-    conn = amfiprot.UsbConnection(VENDOR_ID, PRODUCT_ID)
+    conn = amfiprot.USBConnection(VENDOR_ID, PRODUCT_ID)
     nodes = conn.find_nodes()
 
     print(f"Found {len(nodes)} node(s).")
     for node in nodes:
-        print(f"[{node.id}] {node.name}")
+        print(f"[{node.tx_id}] {node.name}")
 
     dev = amfiprot.Device(nodes[0])
     conn.start()
@@ -94,7 +55,7 @@ The following sections provide a more in-depth explanation.
 After attaching a device to your host machine, you can scan for connected devices (e.g. connected via USB) with:
 
 ```python
-phys_devs = amfiprot.UsbConnection.scan_physical_devices()
+phys_devs = amfiprot.USBConnection.discover()
 
 for dev in phys_devs:
     print(dev)
@@ -103,7 +64,7 @@ for dev in phys_devs:
 A connection can then be created using a specific physical device:
 
 ```python
-conn = amfiprot.UsbConnection(dev['vid'], dev['pid'], dev['serial_number'])
+conn = amfiprot.USBConnection(dev['vid'], dev['pid'], dev['serial_number'])
 ```
 
 Using `serial_number` is optional. If none is given, the first device matching the given vendor and product ID is used.

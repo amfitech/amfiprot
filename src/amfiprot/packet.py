@@ -20,6 +20,7 @@ class PacketDestination(enum.IntEnum):
     PC = 0
     BROADCAST = 255
 
+
 class Header:
     class HeaderIndex(enum.IntEnum):
         PAYLOAD_LENGTH = 0
@@ -81,7 +82,7 @@ class Packet:
             self.payload = create_payload_from_type(payload_data, self.header.payload_type)
 
     @classmethod
-    def from_payload(cls, payload, destination_id, source_id=0, packet_type=PacketType.NO_ACK, packet_number: int = 0):
+    def from_payload(cls, payload, destination_id=PacketDestination.BROADCAST, source_id=0, packet_type=PacketType.NO_ACK, packet_number: int = 0):
         data = array.array('B', [len(payload),
                                  packet_type,
                                  packet_number,
