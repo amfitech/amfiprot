@@ -437,7 +437,8 @@ def generate_device_hash(device: usb.core.Device) -> str:
 
 
 def get_usb_device_by_hash(hash: str) -> Optional[usb.core.Device]:
-    devices = list(usb.core.find(find_all=True))
+    backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
+    devices = list(usb.core.find(find_all=True, backend=backend))
 
     if len(devices) > 0:
         for device in devices:
